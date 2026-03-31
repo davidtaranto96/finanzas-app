@@ -284,13 +284,24 @@ class _WishlistCard extends ConsumerWidget {
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        onPressed: () {
+                        onPressed: () async {
                           final currentBudget = ref.read(safeBudgetProvider);
-                          ref.read(safeBudgetProvider.notifier).state = currentBudget - item.estimatedCost;
-                          ref.read(mockWishlistProvider.notifier).remove(item.id);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('¡A comprar se ha dicho!')),
-                          );
+                          final cost = item.estimatedCost;
+                          
+                          bool proceed = true;
+                          if (cost > currentBudget) {
+                            proceed = await _showBalanceWarningDialog(context, currentBudget, cost) ?? false;
+                          }
+
+                          if (proceed) {
+                            ref.read(safeBudgetProvider.notifier).state = currentBudget - cost;
+                            ref.read(mockWishlistProvider.notifier).remove(item.id);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('¡A comprar se ha dicho!')),
+                              );
+                            }
+                          }
                         },
                       ),
                     ),
@@ -298,6 +309,42 @@ class _WishlistCard extends ConsumerWidget {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool?> _showBalanceWarningDialog(BuildContext context, double current, double cost) {
+    final fmt = NumberFormat.currency(symbol: '\$', decimalDigits: 0, locale: 'es_AR');
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E2C),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: AppTheme.colorWarning),
+            const SizedBox(width: 12),
+            const Text('Presupuesto Insuficiente', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: Text(
+          'Esta compra de ${fmt.format(cost)} supera tu presupuesto libre actual de ${fmt.format(current)}.\n\n¿Querés realizarla igual y quedar en negativo?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.colorWarning,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Proceder', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

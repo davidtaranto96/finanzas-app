@@ -125,32 +125,36 @@ class _AddWishlistBottomSheetState extends ConsumerState<AddWishlistBottomSheet>
           const SizedBox(height: 24),
           Text('¿Cómo lo pagarías?', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              _InstallmentChip(
-                label: 'Contado',
-                isSelected: _installments == 1,
-                onTap: () => setState(() => _installments = 1),
-              ),
-              const SizedBox(width: 8),
-              _InstallmentChip(
-                label: '3 Cuotas',
-                isSelected: _installments == 3,
-                onTap: () => setState(() => _installments = 3),
-              ),
-              const SizedBox(width: 8),
-              _InstallmentChip(
-                label: '6 Cuotas',
-                isSelected: _installments == 6,
-                onTap: () => setState(() => _installments = 6),
-              ),
-              const SizedBox(width: 8),
-              _InstallmentChip(
-                label: '12 Cuotas',
-                isSelected: _installments == 12,
-                onTap: () => setState(() => _installments = 12),
-              ),
-            ],
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                _InstallmentChip(
+                  label: 'Contado',
+                  isSelected: _installments == 1,
+                  onTap: () => setState(() => _installments = 1),
+                ),
+                const SizedBox(width: 8),
+                _InstallmentChip(
+                  label: '3 Cuotas',
+                  isSelected: _installments == 3,
+                  onTap: () => setState(() => _installments = 3),
+                ),
+                const SizedBox(width: 8),
+                _InstallmentChip(
+                  label: '6 Cuotas',
+                  isSelected: _installments == 6,
+                  onTap: () => setState(() => _installments = 6),
+                ),
+                const SizedBox(width: 8),
+                _InstallmentChip(
+                  label: '12 Cuotas',
+                  isSelected: _installments == 12,
+                  onTap: () => setState(() => _installments = 12),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           TextField(

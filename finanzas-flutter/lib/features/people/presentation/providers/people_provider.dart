@@ -7,30 +7,44 @@ import '../../domain/models/group.dart';
 
 final mockPeopleProvider = Provider<List<Person>>((ref) {
   return [
-    Person(
+    const Person(
       id: 'p1',
-      name: 'Sofía',
+      name: 'Sofía Taranto',
+      alias: 'Sofi',
       avatarColor: Colors.pinkAccent,
-      totalBalance: 45000,   // Sofi me debe a mí
+      totalBalance: 27944.33,
+      groupDebts: [
+        DebtDetail(groupName: 'Gastos sin grupo', amount: 35420.00),
+        DebtDetail(groupName: 'Lolla 2026', amount: -7475.67),
+      ],
     ),
-    Person(
+    const Person(
       id: 'p2',
-      name: 'Juan Perez',
-      alias: 'Juancito',
+      name: 'Juan Taranto',
       avatarColor: Colors.blueAccent,
-      totalBalance: -15000,  // Yo le debo a Juan
+      totalBalance: 141380.67,
+      groupDebts: [
+        DebtDetail(groupName: 'Gastos sin grupo', amount: 70750.00),
+        DebtDetail(groupName: 'Lolla 2026', amount: 70630.67),
+      ],
     ),
-    Person(
+    const Person(
       id: 'p3',
       name: 'Martin',
       avatarColor: Colors.greenAccent,
-      totalBalance: 120000,  // Martin me debe mucho (préstamo o similar)
+      totalBalance: 120000,
+      groupDebts: [
+        DebtDetail(groupName: 'Préstamo personal', amount: 120000),
+      ],
     ),
-    Person(
+    const Person(
       id: 'p4',
       name: 'Laura',
       avatarColor: Colors.orangeAccent,
-      totalBalance: 0,       // Estamos saldados
+      totalBalance: -15000,
+      groupDebts: [
+        DebtDetail(groupName: 'Cena Cumple', amount: -15000),
+      ],
     ),
   ];
 });
