@@ -1,8 +1,14 @@
+import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
-import { drizzle } from 'drizzle-orm/expo-sqlite';
-import * as schema from './schema';
 
-const sqlite = SQLite.openDatabaseSync('finanzas.db');
-export const db = drizzle(sqlite, { schema });
+// Singleton — una sola conexión abierta para toda la app
+// Evita NullPointerException en Android al reabrir la BD constantemente
+let _db: SQLite.SQLiteDatabase | null = null;
 
-export type DB = typeof db;
+export function getDb(): SQLite.SQLiteDatabase {
+  if (Platform.OS === 'web') throw new Error('SQLite not available on web');
+  if (!_db) {
+    _db = SQLite.openDatabaseSync('finanzas.db');
+  }
+  return _db;
+}

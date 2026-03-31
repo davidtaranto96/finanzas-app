@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import * as SQLite from 'expo-sqlite';
+import { getDb } from './client';
 import { generateId } from '@/src/lib/utils';
 
 const DEFAULT_CATEGORIES = [
@@ -48,7 +48,7 @@ const DEFAULT_SALARY_RULE = {
 
 export async function seedDatabase() {
   if (Platform.OS === 'web') return; // SQLite no disponible en web
-  const db = SQLite.openDatabaseSync('finanzas.db');
+  const db = getDb();
 
   // Check if already seeded
   const existingCategories = db.getAllSync<{ id: string }>('SELECT id FROM categories LIMIT 1', []);

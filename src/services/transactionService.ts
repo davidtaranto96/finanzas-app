@@ -1,13 +1,7 @@
-import { Platform } from 'react-native';
-import * as SQLite from 'expo-sqlite';
 import { Transaction, TransactionType } from '@/src/lib/types';
 import { generateId } from '@/src/lib/utils';
+import { getDb } from '@/src/db/client';
 import { accountService } from './accountService';
-
-function getDb() {
-  if (Platform.OS === 'web') throw new Error('SQLite not available on web');
-  return SQLite.openDatabaseSync('finanzas.db');
-}
 
 function rowToTransaction(row: any): Transaction {
   return {

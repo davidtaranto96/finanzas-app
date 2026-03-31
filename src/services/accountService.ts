@@ -1,10 +1,6 @@
-import * as SQLite from 'expo-sqlite';
 import { Account, AccountType } from '@/src/lib/types';
 import { generateId } from '@/src/lib/utils';
-
-function getDb() {
-  return SQLite.openDatabaseSync('finanzas.db');
-}
+import { getDb } from '@/src/db/client';
 
 function rowToAccount(row: any): Account {
   return {

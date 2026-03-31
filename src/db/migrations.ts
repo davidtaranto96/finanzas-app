@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import * as SQLite from 'expo-sqlite';
+import { getDb } from './client';
 
 const CREATE_TABLES = `
 PRAGMA journal_mode = WAL;
@@ -181,6 +181,13 @@ CREATE TABLE IF NOT EXISTS achievements (
 
 export async function runMigrations() {
   if (Platform.OS === 'web') return; // SQLite no disponible en web
-  const db = SQLite.openDatabaseSync('finanzas.db');
-  db.execSync(CREATE_TABLES);
+  const db = getDb();
+  // Ejecutar cada statement individualmente para evitar NullPointerException en Android
+  const statements = CREATE_TABLES
+    .split(';')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  for (const stmt of statements) {
+    db.execSync(stmt + ';');
+  }
 }
