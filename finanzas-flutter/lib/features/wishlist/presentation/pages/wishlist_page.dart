@@ -5,9 +5,13 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/database/database_providers.dart';
+import '../../../../core/logic/transaction_service.dart';
+import '../../../../core/utils/format_utils.dart';
 import '../../domain/models/wishlist_item.dart';
 import '../providers/wishlist_provider.dart';
 import '../widgets/add_wishlist_bottom_sheet.dart';
+import '../../../accounts/domain/models/account.dart' as dom_a;
 
 class WishlistPage extends ConsumerWidget {
   const WishlistPage({super.key});
@@ -16,39 +20,56 @@ class WishlistPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(mockWishlistProvider);
     final hourlyRate = ref.watch(mockHourlyRateProvider);
-    final safeBudget = ref.watch(safeBudgetProvider);
+    
+    final accountsAsync = ref.watch(accountsStreamProvider);
+    
+    return accountsAsync.when(
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, s) => Scaffold(body: Center(child: Text('Error: $e'))),
+      data: (accounts) {
+        // Safe Budget Calculation (Real)
+        final arsCash = accounts.where((a) => a.currencyCode == 'ARS' && !a.isCreditCard)
+                               .fold(0.0, (sum, a) => sum + a.balance);
+        final mcDebt = accounts.firstWhere((a) => a.id == 'mc_credit', orElse: () => accounts.first).balance;
+        final visaDebt = accounts.firstWhere((a) => a.id == 'visa_credit', orElse: () => accounts.first).balance;
+        final safeBudget = arsCash - (mcDebt + visaDebt + 317000);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Compras Inteligentes',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 18),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(20),
-        physics: const BouncingScrollPhysics(),
-        itemCount: items.length + 1, // +1 for the top banner
-        separatorBuilder: (context, index) => const SizedBox(height: 16),
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return _SafeBudgetBanner(budget: safeBudget);
-          }
-          final itemIndex = index - 1;
-          return _WishlistCard(
-            item: items[itemIndex],
-            hourlyRate: hourlyRate,
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => AddWishlistBottomSheet.show(context),
-        backgroundColor: AppTheme.colorWarning,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add_shopping_cart_rounded),
-      ),
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(
+              'Compras Inteligentes',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 18),
+            ),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+          ),
+          body: ListView.separated(
+            padding: const EdgeInsets.all(20),
+            physics: const BouncingScrollPhysics(),
+            itemCount: items.length + 1, // +1 for the top banner
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _SafeBudgetBanner(budget: safeBudget);
+              }
+              final itemIndex = index - 1;
+              return _WishlistCard(
+                item: items[itemIndex],
+                hourlyRate: hourlyRate,
+              );
+            },
+          ),
+          floatingActionButton: Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 120),
+            child: FloatingActionButton(
+              onPressed: () => AddWishlistBottomSheet.show(context),
+              backgroundColor: AppTheme.colorWarning,
+              foregroundColor: Colors.white,
+              child: const Icon(Icons.add_shopping_cart_rounded),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -285,7 +306,14 @@ class _WishlistCard extends ConsumerWidget {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: () async {
-                          final currentBudget = ref.read(safeBudgetProvider);
+                          // RE-CALCULATE safe budget for logic (simplified duplicate for now)
+                          final accounts = ref.read(accountsStreamProvider).value ?? [];
+                          final arsCash = accounts.where((a) => a.currencyCode == 'ARS' && !a.isCreditCard)
+                                                 .fold(0.0, (sum, a) => sum + a.balance);
+                          final mcDebt = accounts.firstWhere((a) => a.id == 'mc_credit', orElse: () => accounts.first).balance;
+                          final visaDebt = accounts.firstWhere((a) => a.id == 'visa_credit', orElse: () => accounts.first).balance;
+                          final currentBudget = arsCash - (mcDebt + visaDebt + 317000);
+
                           final cost = item.estimatedCost;
                           
                           bool proceed = true;
@@ -294,11 +322,22 @@ class _WishlistCard extends ConsumerWidget {
                           }
 
                           if (proceed) {
-                            ref.read(safeBudgetProvider.notifier).state = currentBudget - cost;
+                            // 1. Create real transaction (Subtract from MP)
+                            await ref.read(transactionServiceProvider).addTransaction(
+                              title: 'Compra: ${item.title}',
+                              amount: cost,
+                              type: 'expense',
+                              categoryId: 'cat_shopping',
+                              accountId: 'mp_ars',
+                              note: 'Item de Compras Inteligentes',
+                            );
+
+                            // 2. Remove from wishlist
                             ref.read(mockWishlistProvider.notifier).remove(item.id);
+                            
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('¡A comprar se ha dicho!')),
+                                const SnackBar(content: Text('¡Compra realizada y registrada!')),
                               );
                             }
                           }

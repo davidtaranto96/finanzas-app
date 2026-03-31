@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/providers/mock_data_provider.dart';
+
+import '../../../../core/database/database_providers.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../features/transactions/domain/models/transaction.dart';
@@ -15,106 +16,109 @@ class TransactionsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final allTxs = ref.watch(mockTransactionsProvider);
-    final filter = ref.watch(_filterProvider);
+    final txsAsync = ref.watch(transactionsStreamProvider);
+    final filterValue = ref.watch(_filterProvider);
     final cs = Theme.of(context).colorScheme;
 
-    final filtered = allTxs.where((tx) {
-      switch (filter) {
-        case _FilterType.all:
-          return true;
-        case _FilterType.income:
-          return tx.type == TransactionType.income;
-        case _FilterType.expense:
-          return tx.type == TransactionType.expense;
-        case _FilterType.shared:
-          return tx.isShared;
-      }
-    }).toList();
+    return txsAsync.when(
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (err, stack) => Scaffold(body: Center(child: Text('Error DB: $err'))),
+      data: (allTxs) {
+        final filtered = allTxs.where((tx) {
+          switch (filterValue) {
+            case _FilterType.all:
+              return true;
+            case _FilterType.income:
+              return tx.type == TransactionType.income;
+            case _FilterType.expense:
+              return tx.type == TransactionType.expense;
+            case _FilterType.shared:
+              return tx.isShared;
+          }
+        }).toList();
 
-    // Agrupar por fecha
-    final grouped = <String, List<Transaction>>{};
-    for (final tx in filtered) {
-      final key = formatDate(tx.date);
-      grouped.putIfAbsent(key, () => []).add(tx);
-    }
+        // Agrupar por fecha
+        final grouped = <String, List<Transaction>>{};
+        for (final tx in filtered) {
+          final key = formatDate(tx.date);
+          grouped.putIfAbsent(key, () => []).add(tx);
+        }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Movimientos'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.search_rounded, color: cs.onSurface),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: Icon(Icons.filter_list_rounded, color: cs.onSurface),
-            onPressed: () {},
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
-          child: _FilterChips(),
-        ),
-      ),
-      body: grouped.isEmpty
-          ? _EmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: grouped.length,
-              itemBuilder: (context, groupIndex) {
-                final dateKey = grouped.keys.elementAt(groupIndex);
-                final txList = grouped[dateKey]!;
-                final dayTotal = txList.fold<double>(0, (sum, tx) {
-                  if (tx.type == TransactionType.income) return sum + tx.amount;
-                  return sum - tx.realExpense;
-                });
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16, bottom: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            dateKey,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          Text(
-                            '${dayTotal >= 0 ? '+' : ''}${formatAmount(dayTotal)}',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: dayTotal >= 0
-                                  ? AppTheme.colorIncome
-                                  : AppTheme.colorExpense,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    ...txList.map((tx) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _TxRow(transaction: tx),
-                        )),
-                  ],
-                );
-              },
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Movimientos'),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.search_rounded, color: cs.onSurface),
+                onPressed: () {},
+              ),
+              IconButton(
+                icon: Icon(Icons.filter_list_rounded, color: cs.onSurface),
+                onPressed: () {},
+              ),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(56),
+              child: _FilterChips(),
             ),
+          ),
+          body: grouped.isEmpty
+              ? _EmptyState()
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: grouped.length,
+                  itemBuilder: (context, groupIndex) {
+                    final dateKey = grouped.keys.elementAt(groupIndex);
+                    final txList = grouped[dateKey]!;
+                    final dayTotal = txList.fold<double>(0, (sum, tx) {
+                      if (tx.type == TransactionType.income) return sum + tx.amount;
+                      return sum - tx.realExpense;
+                    });
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16, bottom: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                dateKey,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              Text(
+                                '${dayTotal >= 0 ? '+' : ''}${formatAmount(dayTotal)}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: dayTotal >= 0
+                                      ? AppTheme.colorIncome
+                                      : AppTheme.colorExpense,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ...txList.map((tx) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _TxRow(transaction: tx),
+                            )),
+                      ],
+                    );
+                  },
+                ),
+        );
+      },
     );
   }
 }
 
-// ─────────────────────────────────────────────────────
-// Filter chips
-// ─────────────────────────────────────────────────────
 class _FilterChips extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -157,15 +161,13 @@ class _FilterChips extends ConsumerWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────
-// Fila de transacción
-// ─────────────────────────────────────────────────────
 class _TxRow extends StatelessWidget {
   final Transaction transaction;
   const _TxRow({required this.transaction});
 
   static const _icons = {
     'food': '🍔',
+    'cat_food': '🍔',
     'transport': '🚗',
     'health': '🏥',
     'entertainment': '🎬',
@@ -177,13 +179,15 @@ class _TxRow extends StatelessWidget {
     'investment_income': '📈',
     'other_expense': '💸',
     'other_income': '💰',
+    'cat_super': '🛒',
+    'cat_financial': '💳',
   };
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isIncome = transaction.type == TransactionType.income;
-    final color = colorForType(transaction.type);
+    final color = isIncome ? AppTheme.colorIncome : AppTheme.colorExpense;
     final emoji = _icons[transaction.categoryId] ?? '💳';
     final displayAmount =
         transaction.isShared ? transaction.realExpense : transaction.amount;

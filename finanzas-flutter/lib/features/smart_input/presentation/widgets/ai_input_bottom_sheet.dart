@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/logic/transaction_service.dart';
+import '../../../../core/database/database_providers.dart';
 
-class AiInputBottomSheet extends StatefulWidget {
+class AiInputBottomSheet extends ConsumerStatefulWidget {
   const AiInputBottomSheet({super.key});
 
   static Future<void> show(BuildContext context) {
@@ -16,10 +18,10 @@ class AiInputBottomSheet extends StatefulWidget {
   }
 
   @override
-  State<AiInputBottomSheet> createState() => _AiInputBottomSheetState();
+  ConsumerState<AiInputBottomSheet> createState() => _AiInputBottomSheetState();
 }
 
-class _AiInputBottomSheetState extends State<AiInputBottomSheet> {
+class _AiInputBottomSheetState extends ConsumerState<AiInputBottomSheet> {
   final TextEditingController _controller = TextEditingController();
   
   // Simulated parsing state
@@ -56,15 +58,45 @@ class _AiInputBottomSheetState extends State<AiInputBottomSheet> {
     
     setState(() => _isAnalyzing = true);
     
-    // Simulate AI network delay
-    await Future.delayed(const Duration(seconds: 1));
+    // Simulate AI parsing (in a real app, this calls an LLM)
+    await Future.delayed(const Duration(milliseconds: 800));
+    
+    final lower = _controller.text.toLowerCase();
+    double amount = 0;
+    final numberMatch = RegExp(r'\d+').firstMatch(_controller.text);
+    if (numberMatch != null) {
+      amount = double.parse(numberMatch.group(0)!);
+    }
+    
+    String title = "Gasto Inteligente";
+    if (lower.contains('sushi')) title = "Sushi";
+    if (lower.contains('super')) title = "Supermercado";
+    if (lower.contains('alquiler')) title = "Alquiler";
+
+    // Detect type
+    String type = 'expense';
+    if (lower.contains('gané') || lower.contains('cobré') || lower.contains('sueldo')) {
+      type = 'income';
+    }
+
+    // Default account (Mercado Pago for now)
+    const accountId = 'mp_ars'; 
+
+    await ref.read(transactionServiceProvider).addTransaction(
+      title: title,
+      amount: amount,
+      type: type,
+      categoryId: type == 'expense' ? 'cat_food' : 'cat_salary',
+      accountId: accountId,
+      note: _controller.text,
+    );
     
     if (mounted) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Transacción procesada con IA: ${_controller.text}'),
-          backgroundColor: AppTheme.colorTransfer,
+          content: Text('Transacción guardada: $title por \$$amount'),
+          backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
         ),
       );

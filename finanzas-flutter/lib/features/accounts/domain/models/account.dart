@@ -22,6 +22,10 @@ class Account extends Equatable {
   final double? creditLimit;
   final int? closingDay;     // día de cierre
   final int? dueDay;         // día de vencimiento
+  
+  // Tracking para Cierre de Mes
+  final double pendingStatementAmount; // Deuda del resumen anterior
+  final DateTime? lastClosedDate;
 
   const Account({
     required this.id,
@@ -35,13 +39,58 @@ class Account extends Equatable {
     this.creditLimit,
     this.closingDay,
     this.dueDay,
+    this.pendingStatementAmount = 0.0,
+    this.lastClosedDate,
   });
 
   bool get isCreditCard => type == AccountType.credit;
 
   double get availableCredit =>
       isCreditCard ? (creditLimit ?? 0) - balance : balance;
+  
+  /// Total que se debe (Gasto actual + Resumen pendiente de pago)
+  double get totalDebt => isCreditCard ? balance + pendingStatementAmount : 0.0;
+
+  Account copyWith({
+    String? id,
+    String? name,
+    AccountType? type,
+    double? balance,
+    String? currencyCode,
+    String? color,
+    String? icon,
+    bool? isDefault,
+    double? creditLimit,
+    int? closingDay,
+    int? dueDay,
+    double? pendingStatementAmount,
+    DateTime? lastClosedDate,
+  }) {
+    return Account(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      type: type ?? this.type,
+      balance: balance ?? this.balance,
+      currencyCode: currencyCode ?? this.currencyCode,
+      color: color ?? this.color,
+      icon: icon ?? this.icon,
+      isDefault: isDefault ?? this.isDefault,
+      creditLimit: creditLimit ?? this.creditLimit,
+      closingDay: closingDay ?? this.closingDay,
+      dueDay: dueDay ?? this.dueDay,
+      pendingStatementAmount: pendingStatementAmount ?? this.pendingStatementAmount,
+      lastClosedDate: lastClosedDate ?? this.lastClosedDate,
+    );
+  }
 
   @override
-  List<Object?> get props => [id, name, type, balance, currencyCode];
+  List<Object?> get props => [
+        id,
+        name,
+        type,
+        balance,
+        currencyCode,
+        pendingStatementAmount,
+        lastClosedDate
+      ];
 }

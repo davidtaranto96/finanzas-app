@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/logic/month_closure_service.dart';
+import '../../../../core/database/database_providers.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class MonthClosureWizard extends ConsumerWidget {
@@ -22,8 +23,15 @@ class MonthClosureWizard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
+    final accountsAsync = ref.watch(accountsStreamProvider);
 
-    return Container(
+    return accountsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, s) => Center(child: Text('Error: $e')),
+      data: (accounts) {
+        final creditCards = accounts.where((a) => a.isCreditCard).toList();
+        
+        return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
@@ -56,9 +64,13 @@ class MonthClosureWizard extends ConsumerWidget {
           const SizedBox(height: 24),
           
           // Resumen de Deudas a Ciclar
-          _ClosureStatRow(label: 'Mastercard Black', amount: 1522588.00, isDebt: true),
-          _ClosureStatRow(label: 'Visa Signature', amount: 511659.00, isDebt: true),
+          ...creditCards.map((card) => _ClosureStatRow(
+            label: card.name,
+            amount: card.balance,
+            isDebt: true,
+          )),
           const Divider(color: Colors.white10, height: 32),
+
           
           const SizedBox(height: 24),
           
@@ -88,6 +100,8 @@ class MonthClosureWizard extends ConsumerWidget {
           ),
         ],
       ),
+        );
+      },
     );
   }
 }

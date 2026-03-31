@@ -48,31 +48,41 @@ class _MonthlyOverviewPageState extends State<MonthlyOverviewPage> with SingleTi
             IconButton(
               icon: const Icon(Icons.chevron_left_rounded, color: Colors.white54),
               onPressed: () => _changeMonth(-1),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
             ),
+            const SizedBox(width: 4),
             Text(
               '${monthName[0].toUpperCase()}${monthName.substring(1)}',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 16),
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15),
             ),
+            const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Icons.chevron_right_rounded, color: Colors.white54),
               onPressed: () => _changeMonth(1),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
             ),
-            const SizedBox(width: 8),
-            // Botón de Cierre de Mes
-            if (_selectedMonth.month == DateTime.now().month)
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  side: BorderSide(color: AppTheme.colorTransfer.withValues(alpha: 0.5)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                ),
-                onPressed: () => MonthClosureWizard.show(context, _selectedMonth),
-                child: const Text('Cerrar Mes', style: TextStyle(color: Colors.white, fontSize: 11)),
-              ),
           ],
         ),
         centerTitle: true,
         actions: [
+          // Botón de Cierre de Mes
+          if (_selectedMonth.month == DateTime.now().month)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  side: BorderSide(color: AppTheme.colorTransfer.withValues(alpha: 0.5)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  minimumSize: const Size(0, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => MonthClosureWizard.show(context, _selectedMonth),
+                child: const Text('Cerrar Mes', style: TextStyle(color: Colors.white, fontSize: 11)),
+              ),
+            ),
           IconButton(
             icon: Icon(Icons.document_scanner_outlined, color: AppTheme.colorTransfer),
             tooltip: 'Escanear Resumen',

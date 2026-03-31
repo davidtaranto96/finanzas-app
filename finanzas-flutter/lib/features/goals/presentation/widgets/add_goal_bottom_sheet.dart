@@ -79,7 +79,7 @@ class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
     final monthsLeft = hasDeadline ? _deadline!.difference(DateTime.now()).inDays ~/ 30 : 0;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding + 32),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding + 100),
       decoration: const BoxDecoration(
         color: Color(0xFF18181F),
         borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),

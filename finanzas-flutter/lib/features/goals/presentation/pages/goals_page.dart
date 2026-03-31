@@ -105,11 +105,14 @@ class GoalsPage extends ConsumerWidget {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => AddGoalBottomSheet.show(context),
-        backgroundColor: AppTheme.colorTransfer,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add_rounded),
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 120),
+        child: FloatingActionButton(
+          onPressed: () => AddGoalBottomSheet.show(context),
+          backgroundColor: AppTheme.colorTransfer,
+          foregroundColor: Colors.white,
+          child: const Icon(Icons.add_rounded),
+        ),
       ),
     );
   }

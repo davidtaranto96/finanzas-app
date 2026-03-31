@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../features/transactions/domain/models/transaction.dart';
 import '../../features/accounts/domain/models/account.dart';
+import '../../features/people/domain/models/group.dart';
 
 const _uuid = Uuid();
 
@@ -174,3 +175,21 @@ class MonthlyBalance {
   double get balance => income - expense;
   double get savings => income > 0 ? (income - expense) / income : 0;
 }
+
+// ─────────────────────────────────────────────────────
+// Mock de Grupos (Restaurado para estabilidad)
+// ─────────────────────────────────────────────────────
+final mockGroupsProvider = Provider<List<ExpenseGroup>>((ref) {
+  return [
+    const ExpenseGroup(
+      id: 'group_lolla',
+      name: 'Lollapalooza 2026',
+      totalGroupExpense: 150000,
+    ),
+    const ExpenseGroup(
+      id: 'group_home',
+      name: 'Gastos Casa',
+      totalGroupExpense: 85000,
+    ),
+  ];
+});

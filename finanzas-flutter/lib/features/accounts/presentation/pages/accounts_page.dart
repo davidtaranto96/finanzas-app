@@ -1,162 +1,149 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/database/database_providers.dart';
+import '../../../../core/logic/account_service.dart';
 import '../../../../core/utils/format_utils.dart';
-import '../../../../core/providers/mock_data_provider.dart';
+import '../../domain/models/account.dart' as dom;
 
 class AccountsPage extends ConsumerWidget {
   const AccountsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final accounts = ref.watch(mockAccountsProvider);
+    final accountsAsync = ref.watch(accountsStreamProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Mis Cuentas',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 18),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.add_circle_outline_rounded, color: AppTheme.colorTransfer),
-            onPressed: () => _showAddMoneyDialog(context, null),
+    return accountsAsync.when(
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (err, stack) => Scaffold(body: Center(child: Text('Error: $err'))),
+      data: (accounts) {
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: Text(
+              'Tus Cuentas',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 20),
+            ),
           ),
-        ],
-      ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(20),
-        physics: const BouncingScrollPhysics(),
-        itemCount: accounts.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 16),
-        itemBuilder: (context, index) {
-          final acc = accounts[index];
-          return InkWell(
-            onTap: () => _showAddMoneyDialog(context, acc.name), // Simula editar u operar la cuenta
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Color(int.parse(acc.color?.replaceAll('#', '0xFF') ?? '0xFF888888')).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Color(int.parse(acc.color?.replaceAll('#', '0xFF') ?? '0xFF888888')).withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Color(int.parse(acc.color?.replaceAll('#', '0xFF') ?? '0xFF888888')).withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                        _getIconData(acc.icon ?? ''), 
-                        color: Color(int.parse(acc.color?.replaceAll('#', '0xFF') ?? '0xFF888888'))
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          body: ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: accounts.length,
+            itemBuilder: (context, index) {
+              final acc = accounts[index];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E2C),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
                       children: [
-                        Text(
-                          acc.name,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppTheme.colorTransfer.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(_getIconData(acc.icon ?? 'wallet'), color: AppTheme.colorTransfer),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Activa',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                acc.name,
+                                style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                              ),
+                              Text(
+                                formatAmount(acc.balance),
+                                style: GoogleFonts.inter(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              if (acc.pendingStatementAmount > 0) 
+                                Text(
+                                  'Pendiente: ${formatAmount(acc.pendingStatementAmount)}',
+                                  style: TextStyle(color: AppTheme.colorExpense, fontSize: 10),
+                                ),
+                              const SizedBox(height: 4),
+                              Text(
+                                acc.isCreditCard ? 'Gastos' : 'Actual',
+                                style: TextStyle(color: AppTheme.colorTransfer, fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        formatAmount(acc.balance),
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
+                    if (acc.isCreditCard && acc.pendingStatementAmount > 0) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showPayStatementDialog(context, ref, acc),
+                          icon: const Icon(Icons.payments_outlined, size: 16),
+                          label: const Text('Pagar Resumen'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.colorIncome,
+                            side: BorderSide(color: AppTheme.colorIncome.withValues(alpha: 0.5)),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Actual',
-                        style: TextStyle(color: AppTheme.colorTransfer, fontSize: 11, fontWeight: FontWeight.w600),
-                      ),
                     ],
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              );
+            },
+          ),
+          floatingActionButton: Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 120),
+            child: FloatingActionButton.extended(
+              onPressed: () => _showAddMoneyDialog(context, null),
+              backgroundColor: AppTheme.colorTransfer,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.attach_money_rounded),
+              label: const Text('Agregar Fondeo', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddMoneyDialog(context, null),
-        backgroundColor: AppTheme.colorTransfer,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.attach_money_rounded),
-        label: const Text('Agregar Fondeo', style: TextStyle(fontWeight: FontWeight.w600)),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  IconData _getIconData(String name) {
-    if (name.contains('wallet')) return Icons.account_balance_wallet_rounded;
-    if (name.contains('bank') || name.contains('balance')) return Icons.account_balance_rounded;
-    return Icons.credit_card_rounded;
-  }
-
-  void _showAddMoneyDialog(BuildContext context, String? accountName) {
+  void _showAddMoneyDialog(BuildContext context, dom.Account? account) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        final bottomPadding = MediaQuery.of(ctx).viewInsets.bottom;
         return Container(
-          padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding + 32),
+          padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 32),
           decoration: const BoxDecoration(
             color: Color(0xFF18181F),
             borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-                child: Container(
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Icon(Icons.add_card_rounded, color: AppTheme.colorTransfer),
-                  const SizedBox(width: 8),
-                  Text(
-                    accountName != null ? 'Fondeo a $accountName' : 'Nueva Operación Manual',
-                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
-                  ),
-                ],
+              Text(
+                'Operación de Saldo',
+                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
               ),
               const SizedBox(height: 24),
               TextField(
                 keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w600),
+                style: const TextStyle(color: Colors.white, fontSize: 24),
                 decoration: InputDecoration(
                   prefixText: '\$ ',
-                  prefixStyle: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w600),
                   hintText: '0',
                   hintStyle: const TextStyle(color: Colors.white24),
                   labelText: 'Monto a agregar/restar',
@@ -191,5 +178,97 @@ class AccountsPage extends ConsumerWidget {
         );
       },
     );
+  }
+
+  void _showPayStatementDialog(BuildContext context, WidgetRef ref, dom.Account card) {
+    final allAccounts = ref.read(accountsStreamProvider).value ?? [];
+    final sources = allAccounts.where((a) => !a.isCreditCard).toList();
+    dom.Account? selectedSource = sources.isNotEmpty ? sources.first : null;
+    final amountController = TextEditingController(text: card.pendingStatementAmount.toStringAsFixed(0));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final bottomPadding = MediaQuery.of(ctx).viewInsets.bottom;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Container(
+              padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding + 32),
+              decoration: const BoxDecoration(
+                color: Color(0xFF18181F),
+                borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Pagar Resumen: ${card.name}',
+                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Seleccionar origen:', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  DropdownButton<dom.Account>(
+                    value: selectedSource,
+                    dropdownColor: const Color(0xFF1E1E2C),
+                    isExpanded: true,
+                    style: const TextStyle(color: Colors.white),
+                    items: sources.map((s) => DropdownMenuItem(
+                      value: s,
+                      child: Text('${s.name} (${formatAmount(s.balance)})'),
+                    )).toList(),
+                    onChanged: (val) => setState(() => selectedSource = val),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: Colors.white, fontSize: 24),
+                    decoration: const InputDecoration(
+                      prefixText: '\$ ',
+                      labelText: 'Monto a pagar',
+                      labelStyle: TextStyle(color: AppTheme.colorTransfer),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      onPressed: selectedSource == null ? null : () async {
+                        final amount = double.tryParse(amountController.text) ?? 0;
+                        await ref.read(accountServiceProvider).payCardStatement(
+                          sourceAccountId: selectedSource!.id,
+                          cardAccountId: card.id,
+                          amount: amount,
+                        );
+                        if (context.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Pago de resumen registrado.')),
+                          );
+                        }
+                      },
+                      style: FilledButton.styleFrom(backgroundColor: AppTheme.colorIncome),
+                      child: const Text('Confirmar Pago', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+        );
+      },
+    );
+  }
+
+  IconData _getIconData(String name) {
+    if (name.contains('wallet')) return Icons.account_balance_wallet_rounded;
+    if (name.contains('bank') || name.contains('balance')) return Icons.account_balance_rounded;
+    return Icons.credit_card_rounded;
   }
 }

@@ -70,7 +70,7 @@ class DatabaseSeeder {
       id: 'p_sofi',
       name: 'Sofía Taranto',
       alias: const Value('Sovi'),
-      colorValue: const Value(0xFFE91E63),
+      colorValue: 0xFFE91E63,
       totalBalance: const Value(27944.33),
     ));
 
@@ -78,7 +78,7 @@ class DatabaseSeeder {
       id: 'p_juan',
       name: 'Juan Taranto',
       alias: const Value('Juancito'),
-      colorValue: const Value(0xFF2196F3),
+      colorValue: 0xFF2196F3,
       totalBalance: const Value(141380.67),
     ));
 
