@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_theme.dart';
@@ -35,7 +36,7 @@ class AccountDetailPage extends ConsumerWidget {
                 onPressed: () => _showEditAccountDialog(context, ref, account),
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline), 
+                icon: const Icon(Icons.delete_outline, color: AppTheme.colorExpense), 
                 onPressed: () => _confirmDeleteAccount(context, ref, account),
               ),
             ],
@@ -56,9 +57,35 @@ class AccountDetailPage extends ConsumerWidget {
                     ),
                   ),
 
+                  // --- Alias y CBU (Info Extra) ---
+                  if (account.alias != null || account.cvu != null)
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      sliver: SliverToBoxAdapter(
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            children: [
+                              if (account.alias != null)
+                                _InfoRow(label: 'Alias', value: account.alias!),
+                              if (account.alias != null && account.cvu != null)
+                                const Divider(height: 24, color: Colors.white10),
+                              if (account.cvu != null)
+                                _InfoRow(label: 'CBU / CVU', value: account.cvu!),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
                   // --- Historial ---
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
                     sliver: SliverToBoxAdapter(
                       child: Text(
                         'Historial de movimientos',
@@ -91,6 +118,37 @@ class AccountDetailPage extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _InfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+            Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
+          ],
+        ),
+        IconButton(
+          icon: const Icon(Icons.copy_rounded, size: 18, color: AppTheme.colorTransfer),
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: value));
+            ScaffoldMessenger.of(context).showSnackBar(
+               SnackBar(content: Text('$label copiado'), duration: const Duration(seconds: 1)),
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -151,22 +209,17 @@ class _AccountHeroCard extends ConsumerWidget {
               else
                 Expanded(
                   child: _QuickActionButton(
-                    icon: Icons.copy_rounded, 
-                    label: 'Copiar Alias',
-                    onTap: () {
-                      Clipboard.setData(const ClipboardData(text: 'alias.mp.ejemplo'));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Alias copiado al portapapeles'))
-                      );
-                    },
+                    icon: Icons.swap_horiz_rounded, 
+                    label: 'Transferir',
+                    onTap: () => context.push('/transactions/new'),
                   ),
                 ),
               const SizedBox(width: 12),
               Expanded(
                 child: _QuickActionButton(
                   icon: Icons.add_circle_outline_rounded,
-                  label: 'Agregar Fondeo',
-                  onTap: () {},
+                  label: 'Agregar Movimiento',
+                  onTap: () => context.push('/transactions/new'),
                 ),
               ),
             ],
@@ -231,6 +284,10 @@ class _QuickActionButton extends StatelessWidget {
 
 void _showEditAccountDialog(BuildContext context, WidgetRef ref, dom.Account account) {
   final nameController = TextEditingController(text: account.name);
+  final aliasController = TextEditingController(text: account.alias);
+  final cvuController = TextEditingController(text: account.cvu);
+  // Nota: Drift maneja el balance dinámicamente sumando transacciones. 
+  // Pero aquí podríamos permitir editar el balance base si se quisiera.
   
   showModalBottomSheet(
     context: context,
@@ -245,15 +302,36 @@ void _showEditAccountDialog(BuildContext context, WidgetRef ref, dom.Account acc
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 24),
           Text('Editar Cuenta', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white)),
           const SizedBox(height: 24),
           TextField(
             controller: nameController,
-            autofocus: true,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               labelText: 'Nombre de la cuenta',
-              labelStyle: const TextStyle(color: Colors.white38),
+              labelStyle: const TextStyle(color: AppTheme.colorTransfer),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: aliasController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'Alias',
+              labelStyle: const TextStyle(color: AppTheme.colorTransfer),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: cvuController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'CBU / CVU',
+              labelStyle: const TextStyle(color: AppTheme.colorTransfer),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
             ),
           ),
@@ -267,10 +345,9 @@ void _showEditAccountDialog(BuildContext context, WidgetRef ref, dom.Account acc
                   id: account.id,
                   name: nameController.text,
                 );
-                if (context.mounted) {
-                  Navigator.pop(ctx);
-                }
+                if (context.mounted) Navigator.pop(ctx);
               },
+              style: FilledButton.styleFrom(backgroundColor: AppTheme.colorTransfer),
               child: const Text('Guardar Cambios'),
             ),
           ),
@@ -285,19 +362,26 @@ void _confirmDeleteAccount(BuildContext context, WidgetRef ref, dom.Account acco
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: const Color(0xFF1E1E2C),
-      title: const Text('¿Eliminar cuenta?', style: TextStyle(color: Colors.white)),
-      content: Text('Esto borrará "${account.name}" y todos sus movimientos permanentemente.', style: const TextStyle(color: Colors.white70)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: AppTheme.colorExpense),
+          SizedBox(width: 12),
+          Text('¿Eliminar cuenta?', style: TextStyle(color: Colors.white, fontSize: 18)),
+        ],
+      ),
+      content: Text('Esto borrará "${account.name}" y todos sus movimientos permanentemente de forma irreversible.', style: const TextStyle(color: Colors.white70)),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
         TextButton(
           onPressed: () async {
             await ref.read(accountServiceProvider).deleteAccount(account.id);
             if (context.mounted) {
-              Navigator.pop(ctx); // Cerrar dialogo
-              Navigator.pop(context); // Volver atrás (AccountsPage)
+              Navigator.pop(ctx); 
+              Navigator.pop(context);
             }
           }, 
-          child: const Text('Eliminar', style: TextStyle(color: AppTheme.colorExpense)),
+          child: const Text('Eliminar', style: TextStyle(color: AppTheme.colorExpense, fontWeight: FontWeight.bold)),
         ),
       ],
     ),

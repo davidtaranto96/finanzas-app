@@ -38,29 +38,31 @@ class CardAlertBanner extends StatelessWidget {
         children: [
           Icon(Icons.credit_card_rounded, color: color, size: 24),
           const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isClosingSoon ? 'Cierre de tarjeta: $cardName' : 'Vencimiento de pago: $cardName',
-                  style: GoogleFonts.inter(
-                    color: isClosingSoon ? AppTheme.colorWarning : AppTheme.colorExpense,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isClosingSoon ? 'Cierre de tarjeta: $cardName' : 'Vencimiento de pago: $cardName',
+                style: GoogleFonts.inter(
+                  color: isClosingSoon ? AppTheme.colorWarning : (daysToDue < 0 ? AppTheme.colorExpense : AppTheme.colorWarning),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
                 ),
-                Text(
-                   isClosingSoon 
-                      ? 'Cierra en ${closingDate.difference(now).inDays} días (${closingDate.day}/${closingDate.month})'
-                      : daysToDue == 0 
-                          ? 'Vence HOY' 
-                          : 'Vence en $daysToDue días (${dueDate.day}/${dueDate.month})',
-                  style: TextStyle(color: (isClosingSoon ? AppTheme.colorWarning : AppTheme.colorExpense).withValues(alpha: 0.8), fontSize: 12),
-                ),
-              ],
-            ),
+              ),
+              Text(
+                 isClosingSoon 
+                    ? 'Cierra en ${closingDate.difference(now).inDays} días (${closingDate.day}/${closingDate.month})'
+                    : daysToDue == 0 
+                        ? 'Vence HOY' 
+                        : daysToDue < 0 
+                            ? 'PAGO VENCIDO (${dueDate.day}/${dueDate.month})'
+                            : 'Vence en $daysToDue días (${dueDate.day}/${dueDate.month})',
+                style: TextStyle(color: (isClosingSoon ? AppTheme.colorWarning : (daysToDue < 0 ? AppTheme.colorExpense : AppTheme.colorWarning)).withValues(alpha: 0.8), fontSize: 12),
+              ),
+            ],
           ),
+        ),
           Text(
             formatAmount(amount),
             style: GoogleFonts.inter(

@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/material.dart';
 import 'app_database.dart';
 import '../../features/accounts/domain/models/account.dart' as dom;
 import '../../features/transactions/domain/models/transaction.dart' as dom_tx;
 import '../../features/people/domain/models/person.dart' as dom_p;
-import 'package:flutter/material.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();

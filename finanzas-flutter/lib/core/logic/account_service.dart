@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/database_providers.dart';
 import '../../core/models/parsed_transaction.dart';
+export '../../core/models/parsed_transaction.dart' show ImportResult;
 import 'package:uuid/uuid.dart';
 
 class AccountService {
@@ -154,3 +155,4 @@ class AccountService {
 final accountServiceProvider = Provider<AccountService>((ref) {
   return AccountService(ref.watch(databaseProvider));
 });
+

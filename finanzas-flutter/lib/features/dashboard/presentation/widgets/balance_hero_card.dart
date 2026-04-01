@@ -48,13 +48,19 @@ class BalanceHeroCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Presupuesto Libre Seguro',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: cs.onSurfaceVariant,
-                      letterSpacing: 0.5,
-                      fontWeight: FontWeight.w600,
-                    ),
+              Row(
+                children: [
+                   Text(
+                    'Presupuesto Libre Seguro',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          letterSpacing: 0.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.info_outline_rounded, size: 14, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
+                ],
               ),
               _buildSavingsBadge(savingsRate, savingsColor),
             ],

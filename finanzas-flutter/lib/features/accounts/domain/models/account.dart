@@ -27,6 +27,10 @@ class Account extends Equatable {
   final double pendingStatementAmount; // Deuda del resumen anterior
   final DateTime? lastClosedDate;
 
+  // Banking
+  final String? alias;
+  final String? cvu;
+
   const Account({
     required this.id,
     required this.name,
@@ -41,6 +45,8 @@ class Account extends Equatable {
     this.dueDay,
     this.pendingStatementAmount = 0.0,
     this.lastClosedDate,
+    this.alias,
+    this.cvu,
   });
 
   bool get isCreditCard => type == AccountType.credit;
@@ -80,6 +86,8 @@ class Account extends Equatable {
       dueDay: dueDay ?? this.dueDay,
       pendingStatementAmount: pendingStatementAmount ?? this.pendingStatementAmount,
       lastClosedDate: lastClosedDate ?? this.lastClosedDate,
+      alias: alias ?? this.alias,
+      cvu: cvu ?? this.cvu,
     );
   }
 
@@ -91,6 +99,8 @@ class Account extends Equatable {
         balance,
         currencyCode,
         pendingStatementAmount,
-        lastClosedDate
+        lastClosedDate,
+        alias,
+        cvu,
       ];
 }

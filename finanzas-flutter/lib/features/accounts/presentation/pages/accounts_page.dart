@@ -110,13 +110,12 @@ class AccountsPage extends ConsumerWidget {
             },
           ),
           floatingActionButton: Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 120),
-            child: FloatingActionButton.extended(
-              onPressed: () => _showAddAccountDialog(context),
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 100),
+            child: FloatingActionButton(
+              onPressed: () => _showAddAccountDialog(context, ref),
               backgroundColor: AppTheme.colorTransfer,
               foregroundColor: Colors.white,
-              icon: const Icon(Icons.add_card_rounded),
-              label: const Text('Nueva Cuenta', style: TextStyle(fontWeight: FontWeight.w600)),
+              child: const Icon(Icons.add_rounded, size: 32),
             ),
           ),
         );
@@ -124,98 +123,134 @@ class AccountsPage extends ConsumerWidget {
     );
   }
 
-  void _showAddAccountDialog(BuildContext context) {
+  void _showAddAccountDialog(BuildContext context, WidgetRef ref) {
+    final nameController = TextEditingController();
+    final aliasController = TextEditingController();
+    final cvuController = TextEditingController();
+    final balanceController = TextEditingController(text: '0');
+    String selectedType = 'Débito';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Container(
-          padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 32),
-          decoration: const BoxDecoration(
-            color: Color(0xFF18181F),
-            borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Nueva Cuenta / Billetera',
-                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Nombre / Alias de la Cuenta',
-                  labelStyle: const TextStyle(color: AppTheme.colorTransfer),
-                  hintText: 'Ej. Mercado Pago, Efectivo, BBVA',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        return StatefulBuilder(
+          builder: (context, setState) => Container(
+            padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 32),
+            decoration: const BoxDecoration(
+              color: Color(0xFF18181F),
+              borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Nueva Cuenta / Billetera',
+                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'CBU / CVU (Opcional)',
-                  labelStyle: const TextStyle(color: AppTheme.colorTransfer),
-                  suffixIcon: const Icon(Icons.copy_rounded, color: Colors.white24, size: 20),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Nombre / Institución',
+                    labelStyle: const TextStyle(color: AppTheme.colorTransfer),
+                    hintText: 'Ej. Mercado Pago, Efectivo, BBVA',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      keyboardType: TextInputType.number,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'Saldo Inicial',
-                        prefixText: r'$ ',
-                        labelStyle: const TextStyle(color: AppTheme.colorTransfer),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: aliasController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Alias (Opcional)',
+                    labelStyle: const TextStyle(color: AppTheme.colorTransfer),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: cvuController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'CBU / CVU (Opcional)',
+                    labelStyle: const TextStyle(color: AppTheme.colorTransfer),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: balanceController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'Saldo Inicial',
+                          prefixText: r'$ ',
+                          labelStyle: const TextStyle(color: AppTheme.colorTransfer),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.white10),
-                      borderRadius: BorderRadius.circular(16),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.white10),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: DropdownButton<String>(
+                        value: selectedType,
+                        dropdownColor: const Color(0xFF18181F),
+                        underline: const SizedBox(),
+                        style: const TextStyle(color: Colors.white),
+                        items: ['Débito', 'Crédito', 'Efectivo'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedType = val);
+                        },
+                      ),
                     ),
-                    child: DropdownButton<String>(
-                      value: 'Débito',
-                      dropdownColor: const Color(0xFF18181F),
-                      underline: const SizedBox(),
-                      style: const TextStyle(color: Colors.white),
-                      items: ['Débito', 'Crédito', 'Efectivo'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                      onChanged: (val) {},
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: FilledButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Cuenta creada satisfactoriamente')),
-                    );
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.colorTransfer,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  child: const Text('Crear Cuenta', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton(
+                    onPressed: () async {
+                      if (nameController.text.isEmpty) return;
+                      
+                      final type = selectedType == 'Crédito' ? 'credit' : (selectedType == 'Efectivo' ? 'cash' : 'bank');
+                      
+                      await ref.read(accountServiceProvider).addAccount(
+                        name: nameController.text,
+                        type: type,
+                        currencyCode: 'ARS',
+                        initialBalance: double.tryParse(balanceController.text) ?? 0,
+                        iconName: type == 'credit' ? 'credit_card' : 'wallet',
+                      );
+                      
+                      if (context.mounted) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Cuenta creada satisfactoriamente')),
+                        );
+                      }
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.colorTransfer,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text('Crear Cuenta', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

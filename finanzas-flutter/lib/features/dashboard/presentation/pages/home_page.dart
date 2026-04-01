@@ -109,22 +109,32 @@ class HomePage extends ConsumerWidget {
                       SliverAppBar(
                         floating: true,
                         backgroundColor: cs.surface,
-                        title: Row(
+                        title: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Finanzas', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700)),
-                                Text(monthName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: cs.onSurfaceVariant)),
-                              ],
+                            Text(
+                              DateFormat('EEEE', 'es').format(now).toUpperCase(),
+                              style: GoogleFonts.inter(
+                                fontSize: 10, 
+                                fontWeight: FontWeight.w800, 
+                                letterSpacing: 1.5,
+                                color: AppTheme.colorTransfer,
+                              ),
                             ),
-                            const Spacer(),
+                            Text(
+                              DateFormat("d 'de' MMMM", 'es').format(now),
+                              style: GoogleFonts.inter(
+                                fontSize: 24, 
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
                           ],
                         ),
                         actions: [
                           IconButton(
                             icon: const Icon(Icons.notifications_outlined),
-                            onPressed: () {}, // Temporarily disabled, alerts are now in the home list
+                            onPressed: () => _NotificationsBottomSheet.show(context, ref),
                           ),
                           IconButton(
                             icon: const Icon(Icons.settings_outlined),
@@ -233,6 +243,129 @@ class _SyncLoadingOverlay extends StatelessWidget {
   }
 }
 
+
+class _NotificationsBottomSheet extends ConsumerWidget {
+  const _NotificationsBottomSheet({super.key});
+
+  static void show(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _NotificationsBottomSheet(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final accounts = ref.watch(accountsStreamProvider).value ?? [];
+    final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+    final now = DateTime.now();
+    
+    // Logic for notifications
+    final alerts = <Map<String, dynamic>>[];
+    
+    // 1. Credit card alerts
+    for (final card in accounts.where((a) => a.isCreditCard)) {
+      if (card.closingDay != null) {
+        final closing = DateTime(now.year, now.month, card.closingDay!);
+        if (closing.isAfter(now) && closing.difference(now).inDays <= 5) {
+          alerts.add({
+            'title': 'Cierre de tarjeta: ${card.name}',
+            'body': 'Cierra en ${closing.difference(now).inDays} días. Revisá tus gastos ordinarios.',
+            'icon': Icons.credit_card_rounded,
+            'color': AppTheme.colorWarning,
+          });
+        }
+      }
+      if (card.pendingStatementAmount > 0) {
+        final due = DateTime(now.year, now.month, card.dueDay ?? 1);
+        final overdue = due.isBefore(now);
+        alerts.add({
+          'title': overdue ? 'PAGO VENCIDO: ${card.name}' : 'Vencimiento: ${card.name}',
+          'body': 'Tenés un resumen de \$${formatAmount(card.pendingStatementAmount)} por pagar.',
+          'icon': overdue ? Icons.error_outline_rounded : Icons.warning_rounded,
+          'color': AppTheme.colorExpense,
+        });
+      }
+    }
+
+    // 2. Savings goals (dummy logical)
+    final expenseMonth = transactions
+        .where((t) => t.date.month == now.month && t.type == dom_tx.TransactionType.expense)
+        .fold(0.0, (sum, t) => sum + t.amount);
+    
+    if (expenseMonth > 500000) {
+      alerts.add({
+        'title': 'Atención al presupuesto',
+        'body': 'Este mes llevas gastado más de \$500k. ¡Ojo con los gastos hormiga!',
+        'icon': Icons.analytics_outlined,
+        'color': AppTheme.colorWarning,
+      });
+    } else {
+      alerts.add({
+        'title': '¡Vas muy bien!',
+        'body': 'Tu ritmo de gasto es saludable para este punto del mes.',
+        'icon': Icons.thumb_up_alt_rounded,
+        'color': AppTheme.colorIncome,
+      });
+    }
+
+    return Container(
+      // Aumentamos considerablemente el padding inferior para asegurar que se vea por encima de la navBar
+      padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).padding.bottom + 120),
+      decoration: const BoxDecoration(
+        color: Color(0xFF18181F),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text('Alertas y Notificaciones', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
+          const SizedBox(height: 16),
+          if (alerts.isEmpty)
+             const Padding(
+               padding: EdgeInsets.symmetric(vertical: 32),
+               child: Center(child: Text('No hay alertas nuevas por ahora', style: TextStyle(color: Colors.white38))),
+             )
+          else
+            ...alerts.map((a) => Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: (a['color'] as Color).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: (a['color'] as Color).withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(a['icon'], color: a['color'], size: 24),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(a['title'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text(a['body'], style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )),
+        ],
+      ),
+    );
+  }
+}
 
 class _AlertsSection extends ConsumerWidget {
   const _AlertsSection();

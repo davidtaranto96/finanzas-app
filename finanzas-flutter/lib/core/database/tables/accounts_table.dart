@@ -19,6 +19,8 @@ class AccountsTable extends Table {
   // Tracking for Statement Cycles (Cierre de Mes)
   RealColumn get pendingStatementAmount => real().withDefault(const Constant(0.0))();
   DateTimeColumn get lastClosedDate => dateTime().nullable()();
+  TextColumn get alias => text().nullable()();
+  TextColumn get cvu => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

@@ -35,6 +35,18 @@ La aplicación ha completado la migración de **Mock Data** a una base de datos 
    - Error "Bad state: No element" cuando accounts.isEmpty
    - Solución: Validación de lista vacía al inicio
 
+4. **Menú de Gastos Splitwise (Fase 13)** ✨:
+   - Implementada pantalla `AddExpensePage` con estética Splitwise (Imagen 4).
+   - FAB de Personas ahora despliega menú contextual (Gasto repartido, Deuda, Pago).
+   - Lógica de `recordSharedExpense` en `PeopleService` para impactar saldos.
+
+5. **Mejoras en Ingesta de PDFs**:
+   - Añadida capacidad de editar categorías manualmente en el paso de revisión antes de importar.
+
+6. **Fixes de Inicio**:
+   - Botón "Sembrar datos" en Home si la BD está vacía.
+   - Corregido overflow en AppBar de MonthlyOverview.
+
 ---
 
 ## 📋 Pendientes Pendientes (Backlog para próxima sesión)
