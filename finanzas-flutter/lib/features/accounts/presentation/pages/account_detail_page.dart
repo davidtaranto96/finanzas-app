@@ -399,12 +399,12 @@ class _QuickActionButton extends StatelessWidget {
 // ──────────────────────────────────────────────────────
 void _showEditAccountDialog(BuildContext context, WidgetRef ref, dom.Account account) {
   final nameController = TextEditingController(text: account.name);
-  final balanceController = TextEditingController(text: account.balance.toStringAsFixed(0));
+  final balanceController = TextEditingController(text: formatInitialAmount(account.balance));
   final closingDayController = TextEditingController(text: account.closingDay?.toString() ?? '');
   final dueDayController = TextEditingController(text: account.dueDay?.toString() ?? '');
   final aliasController = TextEditingController(text: account.alias ?? '');
   final cvuController = TextEditingController(text: account.cvu ?? '');
-  final creditLimitController = TextEditingController(text: account.creditLimit?.toStringAsFixed(0) ?? '');
+  final creditLimitController = TextEditingController(text: account.creditLimit != null ? formatInitialAmount(account.creditLimit!) : '');
 
   showModalBottomSheet(
     context: context,
@@ -437,6 +437,7 @@ void _showEditAccountDialog(BuildContext context, WidgetRef ref, dom.Account acc
             TextField(
               controller: balanceController,
               keyboardType: TextInputType.number,
+              inputFormatters: [ThousandsSeparatorFormatter()],
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: account.isCreditCard ? 'Gastos del período' : 'Saldo actual',
@@ -484,11 +485,12 @@ void _showEditAccountDialog(BuildContext context, WidgetRef ref, dom.Account acc
               TextField(
                 controller: creditLimitController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [ThousandsSeparatorFormatter()],
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Límite de crédito (opcional)',
                   prefixText: r'$ ',
-                  hintText: 'Ej: 500000',
+                  hintText: 'Ej: 500.000',
                   hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2)),
                   labelStyle: const TextStyle(color: AppTheme.colorTransfer),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
@@ -526,7 +528,7 @@ void _showEditAccountDialog(BuildContext context, WidgetRef ref, dom.Account acc
               height: 52,
               child: FilledButton(
                 onPressed: () async {
-                  final newBalance = double.tryParse(balanceController.text);
+                  final newBalance = balanceController.text.isNotEmpty ? parseFormattedAmount(balanceController.text) : null;
                   double? newInitialBalance;
                   if (newBalance != null && newBalance != account.balance) {
                     final db = ref.read(databaseProvider);
@@ -536,7 +538,7 @@ void _showEditAccountDialog(BuildContext context, WidgetRef ref, dom.Account acc
 
                   final closingDay = int.tryParse(closingDayController.text);
                   final dueDay = int.tryParse(dueDayController.text);
-                  final creditLimit = double.tryParse(creditLimitController.text);
+                  final creditLimit = creditLimitController.text.isNotEmpty ? parseFormattedAmount(creditLimitController.text) : null;
                   final alias = aliasController.text.trim();
                   final cvu = cvuController.text.trim();
 
@@ -669,6 +671,7 @@ void _showAddManualTransactionDialog(BuildContext context, WidgetRef ref, dom.Ac
               TextField(
                 controller: amountController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [ThousandsSeparatorFormatter()],
                 style: const TextStyle(color: Colors.white, fontSize: 24),
                 decoration: InputDecoration(
                   prefixText: r'$ ',
@@ -683,7 +686,7 @@ void _showAddManualTransactionDialog(BuildContext context, WidgetRef ref, dom.Ac
                 height: 52,
                 child: FilledButton(
                   onPressed: () async {
-                    final amount = double.tryParse(amountController.text) ?? 0;
+                    final amount = parseFormattedAmount(amountController.text);
                     if (amount <= 0) return;
                     final title = titleController.text.isEmpty
                         ? (txType == 'expense' ? 'Extracción manual' : 'Depósito manual')
@@ -727,7 +730,7 @@ void _showPayStatementDialog(BuildContext context, WidgetRef ref, dom.Account ac
   final accounts = ref.read(accountsStreamProvider).value ?? [];
   final sources = accounts.where((a) => !a.isCreditCard).toList();
   dom.Account? selectedSource = sources.isNotEmpty ? sources.first : null;
-  final amountController = TextEditingController(text: account.pendingStatementAmount.toStringAsFixed(0));
+  final amountController = TextEditingController(text: formatInitialAmount(account.pendingStatementAmount));
 
   showModalBottomSheet(
     context: context,
@@ -789,6 +792,7 @@ void _showPayStatementDialog(BuildContext context, WidgetRef ref, dom.Account ac
               TextField(
                 controller: amountController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [ThousandsSeparatorFormatter()],
                 style: const TextStyle(color: Colors.white, fontSize: 24),
                 decoration: InputDecoration(
                   prefixText: r'$ ',
@@ -803,7 +807,7 @@ void _showPayStatementDialog(BuildContext context, WidgetRef ref, dom.Account ac
                 height: 52,
                 child: FilledButton(
                   onPressed: selectedSource == null ? null : () async {
-                    final amount = double.tryParse(amountController.text) ?? 0;
+                    final amount = parseFormattedAmount(amountController.text);
                     if (amount <= 0) return;
 
                     await ref.read(accountServiceProvider).payCardStatement(

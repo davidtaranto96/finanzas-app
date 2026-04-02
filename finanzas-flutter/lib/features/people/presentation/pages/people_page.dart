@@ -545,7 +545,7 @@ class _FriendListTile extends ConsumerWidget {
     final accounts = ref.read(accountsStreamProvider).value ?? [];
     final sources = accounts.where((a) => !a.isCreditCard).toList();
     dom_a.Account? selectedSource = sources.isNotEmpty ? sources.first : null;
-    final amountController = TextEditingController(text: person.totalBalance.abs().toStringAsFixed(0));
+    final amountController = TextEditingController(text: formatInitialAmount(person.totalBalance.abs()));
 
     showModalBottomSheet(
       context: context,
@@ -576,6 +576,7 @@ class _FriendListTile extends ConsumerWidget {
               TextField(
                 controller: amountController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [ThousandsSeparatorFormatter()],
                 style: const TextStyle(color: Colors.white, fontSize: 24),
                 decoration: const InputDecoration(prefixText: '\$ ', labelText: 'Monto a liquidar', labelStyle: TextStyle(color: AppTheme.colorTransfer)),
               ),
@@ -585,7 +586,7 @@ class _FriendListTile extends ConsumerWidget {
                 height: 52,
                 child: FilledButton(
                   onPressed: selectedSource == null ? null : () async {
-                    final amount = double.tryParse(amountController.text) ?? 0;
+                    final amount = parseFormattedAmount(amountController.text);
                     final actualAmount = person.totalBalance > 0 ? amount : -amount;
                     
                     await ref.read(peopleServiceProvider).liquidateDebt(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/format_utils.dart';
 import '../../../../core/logic/goal_service.dart';
 import '../../domain/models/goal.dart';
 
@@ -93,8 +94,8 @@ class _AddGoalBottomSheetState extends ConsumerState<AddGoalBottomSheet> {
     final name = _nameController.text.trim();
     final amountText = _targetController.text.trim();
     if (name.isEmpty || amountText.isEmpty) return;
-    final amount = double.tryParse(amountText);
-    if (amount == null || amount <= 0) return;
+    final amount = parseFormattedAmount(amountText);
+    if (amount <= 0) return;
 
     setState(() => _saving = true);
     final service = ref.read(goalServiceProvider);
@@ -253,6 +254,7 @@ class _AddGoalBottomSheetState extends ConsumerState<AddGoalBottomSheet> {
           TextField(
             controller: _targetController,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorFormatter()],
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               prefixText: '\$ ',

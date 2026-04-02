@@ -42,7 +42,7 @@ class _AddExpensePageState extends ConsumerState<AddExpensePage> {
       return;
     }
 
-    final totalAmount = double.tryParse(_amountController.text) ?? 0;
+    final totalAmount = parseFormattedAmount(_amountController.text);
     if (totalAmount <= 0) return;
 
     double ownAmount = 0;
@@ -191,11 +191,12 @@ class _AddExpensePageState extends ConsumerState<AddExpensePage> {
                       TextField(
                         controller: _amountController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [ThousandsSeparatorFormatter()],
                         style: GoogleFonts.inter(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700),
                         decoration: InputDecoration(
                           prefixText: '\$ ',
                           prefixStyle: const TextStyle(color: Colors.white24, fontSize: 28),
-                          hintText: '0.00',
+                          hintText: '0',
                           hintStyle: const TextStyle(color: Colors.white12),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(vertical: 8),

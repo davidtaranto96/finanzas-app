@@ -1,22 +1,98 @@
 import 'package:intl/intl.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../features/transactions/domain/models/transaction.dart';
 import '../theme/app_theme.dart';
 
-/// Formatea montos en ARS
+/// Formatea montos en ARS: $1.234.567
 String formatAmount(double amount, {bool compact = false}) {
-  if (compact && amount.abs() >= 1000000) {
-    return '\$${(amount / 1000000).toStringAsFixed(1)}M';
+  final negative = amount < 0;
+  final abs = amount.abs();
+  if (compact && abs >= 1000000) {
+    return '${negative ? '-' : ''}\$${(abs / 1000000).toStringAsFixed(1)}M';
   }
-  if (compact && amount.abs() >= 1000) {
-    return '\$${(amount / 1000).toStringAsFixed(0)}K';
+  if (compact && abs >= 1000) {
+    return '${negative ? '-' : ''}\$${(abs / 1000).toStringAsFixed(0)}K';
   }
-  final formatter = NumberFormat.currency(
-    locale: 'es_AR',
-    symbol: '\$',
-    decimalDigits: 0,
-  );
-  return formatter.format(amount);
+  final formatter = NumberFormat('#,##0', 'es_AR');
+  return '${negative ? '-' : ''}\$${formatter.format(abs)}';
+}
+
+/// TextInputFormatter que agrega separadores de miles (puntos) mientras escribís.
+/// Acepta solo dígitos, formatea como 1.234.567
+class ThousandsSeparatorFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Solo dígitos
+    final digits = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
+    if (digits.isEmpty) {
+      return newValue.copyWith(text: '', selection: const TextSelection.collapsed(offset: 0));
+    }
+
+    final number = int.tryParse(digits) ?? 0;
+    final formatted = NumberFormat('#,##0', 'es_AR').format(number);
+
+    // Calcular posición del cursor
+    final oldDigits = oldValue.text.replaceAll(RegExp(r'[^\d]'), '');
+    final addedDigits = digits.length - oldDigits.length;
+
+    int newOffset;
+    if (addedDigits >= 0) {
+      // Escribiendo: cursor al final del texto formateado
+      // Contar cuántos dígitos hay hasta la posición original del cursor
+      int digitsBeforeCursor = 0;
+      int rawPos = newValue.selection.baseOffset.clamp(0, newValue.text.length);
+      for (int i = 0; i < rawPos && i < newValue.text.length; i++) {
+        if (RegExp(r'\d').hasMatch(newValue.text[i])) digitsBeforeCursor++;
+      }
+      // Encontrar la posición en el texto formateado que corresponde
+      int count = 0;
+      newOffset = formatted.length;
+      for (int i = 0; i < formatted.length; i++) {
+        if (RegExp(r'\d').hasMatch(formatted[i])) count++;
+        if (count == digitsBeforeCursor) {
+          newOffset = i + 1;
+          break;
+        }
+      }
+    } else {
+      // Borrando
+      int digitsBeforeCursor = 0;
+      int rawPos = newValue.selection.baseOffset.clamp(0, newValue.text.length);
+      for (int i = 0; i < rawPos && i < newValue.text.length; i++) {
+        if (RegExp(r'\d').hasMatch(newValue.text[i])) digitsBeforeCursor++;
+      }
+      int count = 0;
+      newOffset = 0;
+      for (int i = 0; i < formatted.length; i++) {
+        if (RegExp(r'\d').hasMatch(formatted[i])) count++;
+        if (count == digitsBeforeCursor) {
+          newOffset = i + 1;
+          break;
+        }
+      }
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: newOffset.clamp(0, formatted.length)),
+    );
+  }
+}
+
+/// Parsea un string formateado con separadores de miles a double
+double parseFormattedAmount(String text) {
+  final clean = text.replaceAll('.', '').replaceAll(',', '.').trim();
+  return double.tryParse(clean) ?? 0;
+}
+
+/// Formatea un número para usar como valor inicial en un TextEditingController
+/// Ejemplo: 1500000.0 → "1.500.000"
+String formatInitialAmount(double amount) {
+  if (amount == 0) return '';
+  return NumberFormat('#,##0', 'es_AR').format(amount.abs().truncate());
 }
 
 /// Formatea fecha de forma amigable

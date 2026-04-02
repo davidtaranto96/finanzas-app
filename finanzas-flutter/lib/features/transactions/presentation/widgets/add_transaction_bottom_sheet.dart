@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/format_utils.dart';
 import '../../../../core/logic/transaction_service.dart';
 import '../../../../core/logic/account_service.dart';
 import '../../../../core/logic/people_service.dart';
@@ -436,7 +437,7 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
   // ─────────────────────────────────────────────
   void _saveManualTransaction() async {
     if (_amountController.text.isEmpty || _selectedAccount == null) return;
-    final amount = double.tryParse(_amountController.text) ?? 0;
+    final amount = parseFormattedAmount(_amountController.text);
     final typeStr = _type == TransactionType.income ? 'income' : _type == TransactionType.transfer ? 'transfer' : 'expense';
     await ref.read(transactionServiceProvider).addTransaction(
       title: _titleController.text.isEmpty ? 'Movimiento' : _titleController.text,
@@ -634,6 +635,7 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
         TextField(
           controller: _amountController,
           keyboardType: TextInputType.number,
+          inputFormatters: [ThousandsSeparatorFormatter()],
           autofocus: true,
           style: GoogleFonts.inter(fontSize: 48, fontWeight: FontWeight.w900, color: Colors.white),
           decoration: const InputDecoration(
@@ -780,7 +782,7 @@ class _AiConfirmationCardState extends ConsumerState<_AiConfirmationCard> {
   void initState() {
     super.initState();
     _tx = widget.tx;
-    _amountCtrl = TextEditingController(text: _tx.amount?.toStringAsFixed(0) ?? '');
+    _amountCtrl = TextEditingController(text: _tx.amount != null ? formatInitialAmount(_tx.amount!) : '');
     _titleCtrl = TextEditingController(text: _tx.title ?? '');
 
     // Pre-select account from parsed result, or default
@@ -930,9 +932,10 @@ class _AiConfirmationCardState extends ConsumerState<_AiConfirmationCard> {
                 child: TextField(
                   controller: _amountCtrl,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [ThousandsSeparatorFormatter()],
                   style: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white),
                   decoration: const InputDecoration(border: InputBorder.none, isDense: true),
-                  onChanged: (v) => _tx = _tx.copyWith(amount: double.tryParse(v)),
+                  onChanged: (v) => _tx = _tx.copyWith(amount: parseFormattedAmount(v)),
                 ),
               ),
             ],
@@ -1053,7 +1056,7 @@ class _AiConfirmationCardState extends ConsumerState<_AiConfirmationCard> {
                 flex: 2,
                 child: FilledButton(
                   onPressed: () => widget.onConfirm(_finalTx.copyWith(
-                    amount: double.tryParse(_amountCtrl.text) ?? _tx.amount,
+                    amount: _amountCtrl.text.isNotEmpty ? parseFormattedAmount(_amountCtrl.text) : _tx.amount,
                     title: _titleCtrl.text.isNotEmpty ? _titleCtrl.text : _tx.title,
                   )),
                   style: FilledButton.styleFrom(

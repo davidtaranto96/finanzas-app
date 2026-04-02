@@ -271,7 +271,7 @@ class TransactionDetailPage extends ConsumerWidget {
 
   void _showEditDialog(BuildContext context, WidgetRef ref, Transaction tx, List accounts) {
     final titleCtrl = TextEditingController(text: tx.title);
-    final amountCtrl = TextEditingController(text: tx.amount.toStringAsFixed(0));
+    final amountCtrl = TextEditingController(text: formatInitialAmount(tx.amount));
     final noteCtrl = TextEditingController(text: tx.note ?? '');
 
     showModalBottomSheet(
@@ -305,6 +305,7 @@ class TransactionDetailPage extends ConsumerWidget {
               TextField(
                 controller: amountCtrl,
                 keyboardType: TextInputType.number,
+                inputFormatters: [ThousandsSeparatorFormatter()],
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Monto',
@@ -333,7 +334,7 @@ class TransactionDetailPage extends ConsumerWidget {
                     await ref.read(transactionServiceProvider).updateTransaction(
                       id: tx.id,
                       title: titleCtrl.text,
-                      amount: double.tryParse(amountCtrl.text) ?? tx.amount,
+                      amount: amountCtrl.text.isNotEmpty ? parseFormattedAmount(amountCtrl.text) : tx.amount,
                       note: noteCtrl.text.isEmpty ? null : noteCtrl.text,
                     );
                     if (context.mounted) {

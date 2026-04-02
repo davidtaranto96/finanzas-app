@@ -508,6 +508,7 @@ class AccountsPage extends ConsumerWidget {
                         child: TextField(
                           controller: balanceController,
                           keyboardType: TextInputType.number,
+                          inputFormatters: [ThousandsSeparatorFormatter()],
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
                             labelText: selectedType == 'Crédito'
@@ -766,11 +767,12 @@ class AccountsPage extends ConsumerWidget {
                     TextField(
                       controller: creditLimitController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorFormatter()],
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Límite de la tarjeta (opcional)',
                         prefixText: r'$ ',
-                        hintText: 'Ej: 500000',
+                        hintText: 'Ej: 500.000',
                         hintStyle: TextStyle(
                             color:
                                 Colors.white.withValues(alpha: 0.2)),
@@ -785,11 +787,12 @@ class AccountsPage extends ConsumerWidget {
                     TextField(
                       controller: debtController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorFormatter()],
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Deuda actual (opcional)',
                         prefixText: r'$ ',
-                        hintText: 'Ej: 120000',
+                        hintText: 'Ej: 120.000',
                         hintStyle: TextStyle(
                             color:
                                 Colors.white.withValues(alpha: 0.2)),
@@ -826,8 +829,7 @@ class AccountsPage extends ConsumerWidget {
                             ? 'credit'
                             : 'bank';
                         final debt =
-                            double.tryParse(debtController.text) ??
-                                0;
+                            parseFormattedAmount(debtController.text);
 
                         await ref
                             .read(accountServiceProvider)
@@ -835,9 +837,8 @@ class AccountsPage extends ConsumerWidget {
                               name: nameController.text,
                               type: type,
                               currencyCode: 'ARS',
-                              initialBalance: double.tryParse(
-                                      balanceController.text) ??
-                                  0,
+                              initialBalance:
+                                  parseFormattedAmount(balanceController.text),
                               iconName: selectedIcon,
                               colorValue:
                                   selectedColor.toARGB32(),
@@ -849,9 +850,8 @@ class AccountsPage extends ConsumerWidget {
                                   ? int.tryParse(
                                       dueDayController.text)
                                   : null,
-                              creditLimit: type == 'credit'
-                                  ? double.tryParse(
-                                      creditLimitController.text)
+                              creditLimit: type == 'credit' && creditLimitController.text.isNotEmpty
+                                  ? parseFormattedAmount(creditLimitController.text)
                                   : null,
                               pendingStatementAmount:
                                   type == 'credit' ? debt : 0,
@@ -960,6 +960,7 @@ class AccountsPage extends ConsumerWidget {
                 TextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [ThousandsSeparatorFormatter()],
                   style: const TextStyle(
                       color: Colors.white, fontSize: 24),
                   decoration: const InputDecoration(
@@ -980,9 +981,8 @@ class AccountsPage extends ConsumerWidget {
                     onPressed: selectedSource == null
                         ? null
                         : () async {
-                            final amount = double.tryParse(
-                                    amountController.text) ??
-                                0;
+                            final amount =
+                                parseFormattedAmount(amountController.text);
                             final srcId = selectedSource!.id;
                             final txId = await ref
                                 .read(accountServiceProvider)

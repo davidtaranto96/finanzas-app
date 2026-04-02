@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/format_utils.dart';
 import '../../domain/models/wishlist_item.dart';
 import '../providers/wishlist_provider.dart';
 
@@ -108,9 +109,10 @@ class _AddWishlistBottomSheetState extends ConsumerState<AddWishlistBottomSheet>
           TextField(
             controller: _costController,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorFormatter()],
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              hintText: 'Ej. 1200000',
+              hintText: 'Ej. 1.200.000',
               prefixText: '\$ ',
               hintStyle: const TextStyle(color: Colors.white38),
               labelText: 'Valor estimado',
@@ -207,7 +209,7 @@ class _AddWishlistBottomSheetState extends ConsumerState<AddWishlistBottomSheet>
             height: 52,
             child: FilledButton(
               onPressed: () {
-                final cost = double.tryParse(_costController.text) ?? 0.0;
+                final cost = parseFormattedAmount(_costController.text);
                 if (_titleController.text.isEmpty || cost <= 0) return;
 
                 if (widget.itemToEdit != null) {

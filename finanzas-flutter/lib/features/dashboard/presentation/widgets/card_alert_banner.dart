@@ -129,7 +129,7 @@ class CardAlertBanner extends ConsumerWidget {
     final allAccounts = ref.read(accountsStreamProvider).value ?? [];
     final sources = allAccounts.where((a) => !a.isCreditCard).toList();
     dom.Account? selectedSource = sources.isNotEmpty ? sources.first : null;
-    final amountController = TextEditingController(text: amount.toStringAsFixed(0));
+    final amountController = TextEditingController(text: formatInitialAmount(amount));
 
     showModalBottomSheet(
       context: context,
@@ -174,6 +174,7 @@ class CardAlertBanner extends ConsumerWidget {
                 TextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [ThousandsSeparatorFormatter()],
                   style: GoogleFonts.inter(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
@@ -228,8 +229,9 @@ class CardAlertBanner extends ConsumerWidget {
                     onPressed: selectedSource == null
                         ? null
                         : () async {
-                            final payAmount =
-                                double.tryParse(amountController.text) ?? amount;
+                            final payAmount = amountController.text.isNotEmpty
+                                ? parseFormattedAmount(amountController.text)
+                                : amount;
                             if (payAmount <= 0) return;
                             final srcId = selectedSource!.id;
                             final txId = await ref.read(accountServiceProvider).payCardStatement(

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/format_utils.dart';
 import '../../../../core/providers/database_provider.dart';
 import '../../../../core/database/database_seeder.dart';
 import '../../../../core/database/database_providers.dart' hide databaseProvider;
@@ -387,7 +388,7 @@ class _ProfileTile extends ConsumerWidget {
   void _showProfileEditor(BuildContext context, WidgetRef ref, dynamic profile) {
     final nameCtrl = TextEditingController(text: profile?.name ?? '');
     final salaryCtrl = TextEditingController(
-      text: profile?.monthlySalary != null ? profile.monthlySalary.toStringAsFixed(0) : '',
+      text: profile?.monthlySalary != null ? formatInitialAmount(profile.monthlySalary) : '',
     );
     final payDayCtrl = TextEditingController(
       text: profile?.payDay != null ? profile.payDay.toString() : '',
@@ -442,13 +443,14 @@ class _ProfileTile extends ConsumerWidget {
               TextField(
                 controller: salaryCtrl,
                 keyboardType: TextInputType.number,
+                inputFormatters: [ThousandsSeparatorFormatter()],
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Sueldo mensual',
                   labelStyle: const TextStyle(color: AppTheme.colorTransfer),
                   prefixText: r'$ ',
                   prefixIcon: const Icon(Icons.payments_outlined, color: Colors.white38),
-                  hintText: 'Ej: 850000',
+                  hintText: 'Ej: 850.000',
                   hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2)),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                 ),
@@ -482,7 +484,7 @@ class _ProfileTile extends ConsumerWidget {
                     }
                     await ref.read(userProfileServiceProvider).updateProfile(
                       name: nameCtrl.text.trim().isEmpty ? null : nameCtrl.text.trim(),
-                      monthlySalary: double.tryParse(salaryCtrl.text),
+                      monthlySalary: salaryCtrl.text.isNotEmpty ? parseFormattedAmount(salaryCtrl.text) : null,
                       payDay: payDay,
                       clearSalary: salaryCtrl.text.trim().isEmpty,
                       clearPayDay: payDayCtrl.text.trim().isEmpty,
