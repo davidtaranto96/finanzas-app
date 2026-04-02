@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_providers.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/logic/account_service.dart';
+import '../../../../core/logic/transaction_service.dart';
 import '../../../transactions/domain/models/transaction.dart' as dom_tx;
 import '../../domain/models/account.dart' as dom;
 
@@ -692,7 +693,7 @@ void _showAddManualTransactionDialog(BuildContext context, WidgetRef ref, dom.Ac
                         ? (txType == 'expense' ? 'Extracción manual' : 'Depósito manual')
                         : titleController.text;
 
-                    await ref.read(accountServiceProvider).addManualTransaction(
+                    final txId = await ref.read(accountServiceProvider).addManualTransaction(
                       accountId: account.id,
                       title: title,
                       amount: amount,
@@ -701,7 +702,17 @@ void _showAddManualTransactionDialog(BuildContext context, WidgetRef ref, dom.Ac
                     if (context.mounted) {
                       Navigator.pop(ctx);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Movimiento registrado: $title')),
+                        SnackBar(
+                          content: Text('${txType == 'expense' ? 'Extracción' : 'Depósito'}: ${formatAmount(amount)}'),
+                          duration: const Duration(seconds: 6),
+                          action: SnackBarAction(
+                            label: 'DESHACER',
+                            textColor: AppTheme.colorWarning,
+                            onPressed: () async {
+                              await ref.read(transactionServiceProvider).deleteTransaction(txId);
+                            },
+                          ),
+                        ),
                       );
                     }
                   },
@@ -809,16 +820,32 @@ void _showPayStatementDialog(BuildContext context, WidgetRef ref, dom.Account ac
                   onPressed: selectedSource == null ? null : () async {
                     final amount = parseFormattedAmount(amountController.text);
                     if (amount <= 0) return;
+                    final srcId = selectedSource!.id;
 
-                    await ref.read(accountServiceProvider).payCardStatement(
-                      sourceAccountId: selectedSource!.id,
+                    final txId = await ref.read(accountServiceProvider).payCardStatement(
+                      sourceAccountId: srcId,
                       cardAccountId: account.id,
                       amount: amount,
                     );
                     if (context.mounted) {
                       Navigator.pop(ctx);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Pago de resumen registrado')),
+                        SnackBar(
+                          content: Text('Pago de ${formatAmount(amount)} registrado'),
+                          duration: const Duration(seconds: 6),
+                          action: SnackBarAction(
+                            label: 'DESHACER',
+                            textColor: AppTheme.colorWarning,
+                            onPressed: () async {
+                              await ref.read(accountServiceProvider).undoPayCardStatement(
+                                sourceAccountId: srcId,
+                                cardAccountId: account.id,
+                                amount: amount,
+                                transactionId: txId,
+                              );
+                            },
+                          ),
+                        ),
                       );
                     }
                   },

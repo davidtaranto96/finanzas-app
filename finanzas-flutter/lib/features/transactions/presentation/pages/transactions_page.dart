@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/database/database_providers.dart';
+import '../../../../core/logic/transaction_service.dart';
 import '../../../../core/providers/shell_providers.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -225,12 +226,12 @@ class _FilterChips extends ConsumerWidget {
   }
 }
 
-class _TxRow extends StatelessWidget {
+class _TxRow extends ConsumerWidget {
   final Transaction transaction;
   const _TxRow({required this.transaction});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final isIncome = transaction.type == TransactionType.income || transaction.type == TransactionType.loanReceived;
     final color = colorForType(transaction.type);
@@ -249,14 +250,18 @@ class _TxRow extends StatelessWidget {
         ),
         child: const Icon(Icons.delete_outline_rounded, color: AppTheme.colorExpense),
       ),
-      onDismissed: (_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Movimiento eliminado')),
-        );
+      confirmDismiss: (_) async {
+        await ref.read(transactionServiceProvider).deleteTransaction(transaction.id);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${transaction.title} eliminado — saldo restaurado')),
+          );
+        }
+        return false; // Stream will rebuild without this item
       },
       child: InkWell(
         onTap: () => context.push('/transactions/${transaction.id}'),
-        onLongPress: () => _showTransactionOptions(context, transaction),
+        onLongPress: () => _showTransactionOptions(context, ref, transaction),
         borderRadius: BorderRadius.circular(14),
         child: Container(
           padding: const EdgeInsets.all(14),
@@ -348,7 +353,7 @@ class _TxRow extends StatelessWidget {
     }
   }
 
-  void _showTransactionOptions(BuildContext context, Transaction tx) {
+  void _showTransactionOptions(BuildContext context, WidgetRef ref, Transaction tx) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -361,23 +366,73 @@ class _TxRow extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(2)))),
+            Text(tx.title, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+            Text(formatAmount(tx.amount), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
             ListTile(
               leading: const Icon(Icons.edit_rounded, color: AppTheme.colorTransfer),
               title: const Text('Editar Movimiento', style: TextStyle(color: Colors.white)),
-              onTap: () => Navigator.pop(ctx),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/transactions/${tx.id}');
+              },
             ),
             ListTile(
               leading: const Icon(Icons.copy_rounded, color: Colors.white54),
               title: const Text('Duplicar', style: TextStyle(color: Colors.white)),
-              onTap: () => Navigator.pop(ctx),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await ref.read(transactionServiceProvider).duplicateTransaction(tx.id);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Movimiento duplicado: ${tx.title}')),
+                  );
+                }
+              },
             ),
             ListTile(
               leading: const Icon(Icons.delete_forever_rounded, color: AppTheme.colorExpense),
               title: const Text('Eliminar permanentemente', style: TextStyle(color: AppTheme.colorExpense)),
-              onTap: () => Navigator.pop(ctx),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDeleteTransaction(context, ref, tx);
+              },
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _confirmDeleteTransaction(BuildContext context, WidgetRef ref, Transaction tx) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E2C),
+        title: const Text('Eliminar movimiento', style: TextStyle(color: Colors.white)),
+        content: Text(
+          '${tx.title} — ${formatAmount(tx.amount)}\n\nEl saldo de la cuenta se restaurará. Esta acción no se puede deshacer.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref.read(transactionServiceProvider).deleteTransaction(tx.id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${tx.title} eliminado — saldo restaurado')),
+                );
+              }
+            },
+            child: const Text('Eliminar', style: TextStyle(color: AppTheme.colorExpense, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

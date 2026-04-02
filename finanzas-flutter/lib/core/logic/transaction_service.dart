@@ -51,24 +51,77 @@ class TransactionService {
   }
 
   /// Updates title, amount, and/or note of an existing transaction.
+  /// If amount changes, adjusts the account balance accordingly.
   Future<void> updateTransaction({
     required String id,
     String? title,
     double? amount,
     String? note,
   }) async {
-    await (db.update(db.transactionsTable)..where((t) => t.id.equals(id))).write(
-      TransactionsTableCompanion(
-        title: title != null ? drift.Value(title) : const drift.Value.absent(),
-        amount: amount != null ? drift.Value(amount) : const drift.Value.absent(),
-        note: note != null ? drift.Value(note) : const drift.Value.absent(),
-      ),
-    );
+    await db.transaction(() async {
+      final tx = await (db.select(db.transactionsTable)..where((t) => t.id.equals(id))).getSingle();
+
+      // If amount changed, adjust account balance
+      if (amount != null && amount != tx.amount) {
+        final account = await (db.select(db.accountsTable)..where((t) => t.id.equals(tx.accountId))).getSingle();
+        double balanceAdjust = 0;
+        if (tx.type == 'expense') {
+          balanceAdjust = tx.amount - amount; // old was subtracted, new needs to be subtracted
+        } else if (tx.type == 'income') {
+          balanceAdjust = amount - tx.amount; // old was added, new needs to be added
+        }
+        if (balanceAdjust != 0) {
+          await (db.update(db.accountsTable)..where((t) => t.id.equals(tx.accountId))).write(
+            AccountsTableCompanion(initialBalance: drift.Value(account.initialBalance + balanceAdjust)),
+          );
+        }
+      }
+
+      await (db.update(db.transactionsTable)..where((t) => t.id.equals(id))).write(
+        TransactionsTableCompanion(
+          title: title != null ? drift.Value(title) : const drift.Value.absent(),
+          amount: amount != null ? drift.Value(amount) : const drift.Value.absent(),
+          note: note != null ? drift.Value(note) : const drift.Value.absent(),
+        ),
+      );
+    });
   }
 
-  /// Deletes a transaction.
+  /// Deletes a transaction and reverses the account balance impact.
   Future<void> deleteTransaction(String id) async {
-    await (db.delete(db.transactionsTable)..where((t) => t.id.equals(id))).go();
+    await db.transaction(() async {
+      final tx = await (db.select(db.transactionsTable)..where((t) => t.id.equals(id))).getSingle();
+      final account = await (db.select(db.accountsTable)..where((t) => t.id.equals(tx.accountId))).getSingle();
+
+      // Reverse the balance impact
+      double newBalance = account.initialBalance;
+      if (tx.type == 'expense') {
+        newBalance += tx.amount; // was subtracted, add back
+      } else if (tx.type == 'income') {
+        newBalance -= tx.amount; // was added, subtract back
+      }
+
+      await (db.update(db.accountsTable)..where((t) => t.id.equals(tx.accountId))).write(
+        AccountsTableCompanion(initialBalance: drift.Value(newBalance)),
+      );
+
+      await (db.delete(db.transactionsTable)..where((t) => t.id.equals(id))).go();
+    });
+  }
+
+  /// Duplicates a transaction (creates a copy with new id and current date).
+  Future<void> duplicateTransaction(String id) async {
+    final tx = await (db.select(db.transactionsTable)..where((t) => t.id.equals(id))).getSingle();
+
+    await addTransaction(
+      title: tx.title,
+      amount: tx.amount,
+      type: tx.type,
+      categoryId: tx.categoryId,
+      accountId: tx.accountId,
+      date: DateTime.now(),
+      note: tx.note,
+    );
   }
 }
 

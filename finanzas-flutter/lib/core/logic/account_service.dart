@@ -206,22 +206,39 @@ class AccountService {
   }
 
   /// Adds a manual transaction (deposit or withdrawal) to an account.
-  Future<void> addManualTransaction({
+  /// Returns the transaction ID for undo support.
+  Future<String> addManualTransaction({
     required String accountId,
     required String title,
     required double amount,
     required String type, // 'income' or 'expense'
   }) async {
-    await db.into(db.transactionsTable).insert(TransactionsTableCompanion.insert(
-      id: const Uuid().v4(),
-      title: title,
-      amount: amount,
-      type: type,
-      categoryId: type == 'income' ? 'cat_income' : 'cat_other',
-      accountId: accountId,
-      date: DateTime.now(),
-      note: const drift.Value('Movimiento manual'),
-    ));
+    final txId = const Uuid().v4();
+    await db.transaction(() async {
+      await db.into(db.transactionsTable).insert(TransactionsTableCompanion.insert(
+        id: txId,
+        title: title,
+        amount: amount,
+        type: type,
+        categoryId: type == 'income' ? 'cat_income' : 'cat_other',
+        accountId: accountId,
+        date: DateTime.now(),
+        note: const drift.Value('Movimiento manual'),
+      ));
+
+      // Update account balance
+      final account = await (db.select(db.accountsTable)..where((t) => t.id.equals(accountId))).getSingle();
+      double newBalance = account.initialBalance;
+      if (type == 'expense') {
+        newBalance -= amount;
+      } else if (type == 'income') {
+        newBalance += amount;
+      }
+      await (db.update(db.accountsTable)..where((t) => t.id.equals(accountId))).write(
+        AccountsTableCompanion(initialBalance: drift.Value(newBalance)),
+      );
+    });
+    return txId;
   }
 
   /// Deletes an account and its transactions.
