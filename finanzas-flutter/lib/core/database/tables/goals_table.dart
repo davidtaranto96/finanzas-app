@@ -7,6 +7,7 @@ class GoalsTable extends Table {
   RealColumn get targetAmount => real()();
   RealColumn get currentAmount => real().withDefault(const Constant(0.0))();
   IntColumn get colorValue => integer()();
+  TextColumn get iconName => text().nullable()();
   DateTimeColumn get deadline => dateTime().nullable()();
 
   @override

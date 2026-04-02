@@ -8,7 +8,7 @@ import '../../../../core/database/database_providers.dart';
 import '../../../../core/logic/people_service.dart';
 import '../../domain/models/person.dart';
 import '../../../../core/utils/format_utils.dart';
-import '../../../../core/providers/mock_data_provider.dart';
+
 import '../../../accounts/domain/models/account.dart' as dom_a;
 import '../../../transactions/domain/models/transaction.dart' as dom_tx;
 import 'add_expense_page.dart';
@@ -145,11 +145,14 @@ class _PeoplePageState extends ConsumerState<PeoplePage> {
               ],
             ),
             floatingActionButton: Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 90),
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 85),
               child: FloatingActionButton(
                 onPressed: () => _showFabMenu(context),
                 backgroundColor: AppTheme.colorTransfer,
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 32),
+                foregroundColor: Colors.white,
+                elevation: 8,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                child: const Icon(Icons.add_rounded, size: 28),
               ),
             ),
           );
@@ -323,7 +326,7 @@ class _PeoplePageState extends ConsumerState<PeoplePage> {
   }
 
   Widget _buildGroupsTab(BuildContext context, WidgetRef ref, String query) {
-    final allGroups = ref.watch(mockGroupsProvider);
+    final allGroups = ref.watch(groupsStreamProvider).valueOrNull ?? [];
     final groups = allGroups.where((g) => g.name.toLowerCase().contains(query)).toList();
 
     if (groups.isEmpty) {

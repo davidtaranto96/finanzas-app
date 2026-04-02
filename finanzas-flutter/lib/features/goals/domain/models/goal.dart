@@ -7,8 +7,8 @@ class Goal extends Equatable {
   final double targetAmount;
   final double savedAmount;
   final DateTime? deadline;
-  final IconData icon;
-  final Color color;
+  final String iconName;
+  final int colorValue;
 
   const Goal({
     required this.id,
@@ -16,9 +16,25 @@ class Goal extends Equatable {
     required this.targetAmount,
     required this.savedAmount,
     this.deadline,
-    required this.icon,
-    required this.color,
+    this.iconName = 'flag',
+    required this.colorValue,
   });
+
+  static const Map<String, IconData> iconMap = {
+    'flag': Icons.flag_rounded,
+    'travel': Icons.flight_takeoff_rounded,
+    'home': Icons.home_rounded,
+    'car': Icons.directions_car_rounded,
+    'laptop': Icons.laptop_mac_rounded,
+    'game': Icons.videogame_asset_rounded,
+    'shop': Icons.shopping_bag_rounded,
+    'food': Icons.restaurant_rounded,
+    'fitness': Icons.fitness_center_rounded,
+    'savings': Icons.savings_rounded,
+  };
+
+  IconData get icon => iconMap[iconName] ?? Icons.flag_rounded;
+  Color get color => Color(colorValue);
 
   double get remaining => targetAmount > savedAmount ? targetAmount - savedAmount : 0.0;
   double get progress => targetAmount > 0 ? (savedAmount / targetAmount).clamp(0.0, 1.0) : 0.0;

@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/database/database_providers.dart';
+import '../../../../core/providers/shell_providers.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../features/transactions/domain/models/transaction.dart';
+import '../widgets/add_transaction_bottom_sheet.dart' show kCategoryEmojis;
 
 enum _FilterType { all, income, expense, shared }
+enum _SortMode { byDate, byAmountDesc, byAmountAsc }
 
 final _filterProvider = StateProvider<_FilterType>((ref) => _FilterType.all);
 
@@ -18,21 +22,18 @@ class TransactionsPage extends ConsumerStatefulWidget {
   ConsumerState<TransactionsPage> createState() => _TransactionsPageState();
 }
 
-class _TransactionsPageState extends ConsumerState<TransactionsPage> {
-  final TextEditingController _searchController = TextEditingController();
-  bool _isSearching = false;
-  String _searchQuery = '';
+class _TransactionsPageState extends ConsumerState<TransactionsPage> with AutomaticKeepAliveClientMixin {
+  _SortMode _sortMode = _SortMode.byDate;
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
+  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final txsAsync = ref.watch(transactionsStreamProvider);
     final filterValue = ref.watch(_filterProvider);
+    final searchQuery = ref.watch(txSearchQueryProvider);
     final cs = Theme.of(context).colorScheme;
 
     return txsAsync.when(
@@ -40,62 +41,134 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
       error: (err, stack) => Scaffold(body: Center(child: Text('Error DB: $err'))),
       data: (allTxs) {
         final filtered = allTxs.where((tx) {
-          final matchesSearch = tx.title.toLowerCase().contains(_searchQuery.toLowerCase()) || 
-                               (tx.note?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
+          final matchesSearch = tx.title.toLowerCase().contains(searchQuery.toLowerCase()) ||
+                               (tx.note?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
           if (!matchesSearch) return false;
 
           switch (filterValue) {
             case _FilterType.all:
               return true;
             case _FilterType.income:
-              return tx.type == TransactionType.income;
+              return tx.type == TransactionType.income || tx.type == TransactionType.loanReceived;
             case _FilterType.expense:
-              return tx.type == TransactionType.expense;
+              return tx.type == TransactionType.expense || tx.type == TransactionType.loanGiven;
             case _FilterType.shared:
               return tx.isShared;
           }
         }).toList();
 
-        // Agrupar por fecha
-        final grouped = <String, List<Transaction>>{};
-        for (final tx in filtered) {
-          final key = formatDate(tx.date);
-          grouped.putIfAbsent(key, () => []).add(tx);
+        // Aplicar sort
+        if (_sortMode == _SortMode.byAmountDesc) {
+          filtered.sort((a, b) => b.amount.compareTo(a.amount));
+        } else if (_sortMode == _SortMode.byAmountAsc) {
+          filtered.sort((a, b) => a.amount.compareTo(b.amount));
+        } else {
+          filtered.sort((a, b) => b.date.compareTo(a.date));
         }
+
+        // Agrupar por fecha (solo cuando se ordena por fecha)
+        final grouped = <String, List<Transaction>>{};
+        if (_sortMode == _SortMode.byDate) {
+          for (final tx in filtered) {
+            final key = formatDate(tx.date);
+            grouped.putIfAbsent(key, () => []).add(tx);
+          }
+        } else {
+          // Sin agrupación: usar el monto como key para mostrar lista plana con separadores
+          grouped['all'] = filtered;
+        }
+
+        final listContent = grouped.isEmpty
+            ? _EmptyState()
+            : _sortMode == _SortMode.byDate
+                ? ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: grouped.length,
+                    itemBuilder: (context, groupIndex) {
+                      final dateKey = grouped.keys.elementAt(groupIndex);
+                      final txList = grouped[dateKey]!;
+                      final dayTotal = txList.fold<double>(0, (sum, tx) {
+                        if (tx.type == TransactionType.income || tx.type == TransactionType.loanReceived) return sum + tx.amount;
+                        return sum - tx.realExpense;
+                      });
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16, bottom: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  dateKey,
+                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  '${dayTotal >= 0 ? '+' : ''}${formatAmount(dayTotal)}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: dayTotal >= 0 ? AppTheme.colorIncome : AppTheme.colorExpense,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ...txList.map((tx) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: _TxRow(transaction: tx),
+                              )),
+                        ],
+                      );
+                    },
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, i) => _TxRow(transaction: filtered[i]),
+                  );
 
         return Scaffold(
           appBar: AppBar(
-            title: _isSearching 
-              ? TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    hintText: 'Buscar movimiento...',
-                    border: InputBorder.none,
-                    hintStyle: TextStyle(color: Colors.white38),
-                  ),
-                  style: const TextStyle(color: Colors.white),
-                  onChanged: (val) => setState(() => _searchQuery = val),
-                )
-              : const Text('Movimientos'),
+            title: Text('Movimientos',
+                style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w700)),
             actions: [
-              IconButton(
-                icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded, color: cs.onSurface),
-                onPressed: () {
-                  setState(() {
-                    if (_isSearching) {
-                      _isSearching = false;
-                      _searchQuery = '';
-                      _searchController.clear();
-                    } else {
-                      _isSearching = true;
-                    }
-                  });
-                },
-              ),
-              IconButton(
-                icon: Icon(Icons.filter_list_rounded, color: cs.onSurface),
-                onPressed: () {},
+              PopupMenuButton<_SortMode>(
+                icon: Icon(
+                  _sortMode == _SortMode.byDate ? Icons.sort_by_alpha_rounded : Icons.sort_rounded,
+                  color: _sortMode != _SortMode.byDate ? cs.primary : cs.onSurface,
+                ),
+                tooltip: 'Ordenar',
+                color: const Color(0xFF1E1E2C),
+                onSelected: (mode) => setState(() => _sortMode = mode),
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: _SortMode.byDate,
+                    child: Row(children: [
+                      Icon(Icons.calendar_today_rounded, size: 16, color: _sortMode == _SortMode.byDate ? cs.primary : Colors.white54),
+                      const SizedBox(width: 10),
+                      Text('Por fecha', style: TextStyle(color: _sortMode == _SortMode.byDate ? cs.primary : Colors.white)),
+                    ]),
+                  ),
+                  PopupMenuItem(
+                    value: _SortMode.byAmountDesc,
+                    child: Row(children: [
+                      Icon(Icons.arrow_downward_rounded, size: 16, color: _sortMode == _SortMode.byAmountDesc ? cs.primary : Colors.white54),
+                      const SizedBox(width: 10),
+                      Text('Mayor a menor', style: TextStyle(color: _sortMode == _SortMode.byAmountDesc ? cs.primary : Colors.white)),
+                    ]),
+                  ),
+                  PopupMenuItem(
+                    value: _SortMode.byAmountAsc,
+                    child: Row(children: [
+                      Icon(Icons.arrow_upward_rounded, size: 16, color: _sortMode == _SortMode.byAmountAsc ? cs.primary : Colors.white54),
+                      const SizedBox(width: 10),
+                      Text('Menor a mayor', style: TextStyle(color: _sortMode == _SortMode.byAmountAsc ? cs.primary : Colors.white)),
+                    ]),
+                  ),
+                ],
               ),
             ],
             bottom: PreferredSize(
@@ -103,57 +176,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               child: _FilterChips(),
             ),
           ),
-          body: grouped.isEmpty
-              ? _EmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  itemCount: grouped.length,
-                  itemBuilder: (context, groupIndex) {
-                    final dateKey = grouped.keys.elementAt(groupIndex);
-                    final txList = grouped[dateKey]!;
-                    final dayTotal = txList.fold<double>(0, (sum, tx) {
-                      if (tx.type == TransactionType.income) return sum + tx.amount;
-                      return sum - tx.realExpense;
-                    });
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(top: 16, bottom: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                dateKey,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                              Text(
-                                '${dayTotal >= 0 ? '+' : ''}${formatAmount(dayTotal)}',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: dayTotal >= 0
-                                      ? AppTheme.colorIncome
-                                      : AppTheme.colorExpense,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ...txList.map((tx) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: _TxRow(transaction: tx),
-                            )),
-                      ],
-                    );
-                  },
-                ),
+          body: listContent,
         );
       },
     );
@@ -206,32 +229,13 @@ class _TxRow extends StatelessWidget {
   final Transaction transaction;
   const _TxRow({required this.transaction});
 
-  static const _icons = {
-    'food': '🍔',
-    'cat_food': '🍔',
-    'transport': '🚗',
-    'health': '🏥',
-    'entertainment': '🎬',
-    'shopping': '🛍️',
-    'home': '🏠',
-    'education': '📚',
-    'salary': '💼',
-    'freelance': '💻',
-    'investment_income': '📈',
-    'other_expense': '💸',
-    'other_income': '💰',
-    'cat_super': '🛒',
-    'cat_financial': '💳',
-  };
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isIncome = transaction.type == TransactionType.income;
-    final color = isIncome ? AppTheme.colorIncome : AppTheme.colorExpense;
-    final emoji = _icons[transaction.categoryId] ?? '💳';
-    final displayAmount =
-        transaction.isShared ? transaction.realExpense : transaction.amount;
+    final isIncome = transaction.type == TransactionType.income || transaction.type == TransactionType.loanReceived;
+    final color = colorForType(transaction.type);
+    final emoji = kCategoryEmojis[transaction.categoryId] ?? _emojiForType(transaction.type);
+    final displayAmount = transaction.isShared ? transaction.realExpense : transaction.amount;
 
     return Dismissible(
       key: Key(transaction.id),
@@ -251,6 +255,7 @@ class _TxRow extends StatelessWidget {
         );
       },
       child: InkWell(
+        onTap: () => context.push('/transactions/${transaction.id}'),
         onLongPress: () => _showTransactionOptions(context, transaction),
         borderRadius: BorderRadius.circular(14),
         child: Container(
@@ -326,6 +331,21 @@ class _TxRow extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _emojiForType(TransactionType type) {
+    switch (type) {
+      case TransactionType.income:
+        return '💰';
+      case TransactionType.expense:
+        return '💸';
+      case TransactionType.transfer:
+        return '🔄';
+      case TransactionType.loanGiven:
+        return '👆';
+      case TransactionType.loanReceived:
+        return '👇';
+    }
   }
 
   void _showTransactionOptions(BuildContext context, Transaction tx) {
@@ -410,3 +430,4 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
+

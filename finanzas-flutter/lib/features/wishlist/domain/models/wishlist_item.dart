@@ -9,6 +9,8 @@ class WishlistItem extends Equatable {
   final int installments;
   final bool hasPromo;
   final DateTime createdAt;
+  final bool isPurchased;
+  final DateTime? purchasedAt;
 
   const WishlistItem({
     required this.id,
@@ -19,6 +21,8 @@ class WishlistItem extends Equatable {
     this.installments = 1,
     this.hasPromo = false,
     required this.createdAt,
+    this.isPurchased = false,
+    this.purchasedAt,
   });
 
   WishlistItem copyWith({
@@ -30,6 +34,8 @@ class WishlistItem extends Equatable {
     int? installments,
     bool? hasPromo,
     DateTime? createdAt,
+    bool? isPurchased,
+    DateTime? purchasedAt,
   }) {
     return WishlistItem(
       id: id ?? this.id,
@@ -40,9 +46,11 @@ class WishlistItem extends Equatable {
       installments: installments ?? this.installments,
       hasPromo: hasPromo ?? this.hasPromo,
       createdAt: createdAt ?? this.createdAt,
+      isPurchased: isPurchased ?? this.isPurchased,
+      purchasedAt: purchasedAt ?? this.purchasedAt,
     );
   }
 
   @override
-  List<Object?> get props => [id, title, estimatedCost, note, url, installments, hasPromo, createdAt];
+  List<Object?> get props => [id, title, estimatedCost, note, url, installments, hasPromo, createdAt, isPurchased];
 }

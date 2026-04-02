@@ -8,114 +8,119 @@ import '../../../../core/logic/account_service.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../domain/models/account.dart' as dom;
 
+const _accountIcons = <String, IconData>{
+  'wallet': Icons.account_balance_wallet_rounded,
+  'bank': Icons.account_balance_rounded,
+  'credit_card': Icons.credit_card_rounded,
+  'savings': Icons.savings_rounded,
+  'cash': Icons.payments_rounded,
+  'phone': Icons.phone_android_rounded,
+  'store': Icons.store_rounded,
+  'piggy': Icons.savings_outlined,
+  'chart': Icons.show_chart_rounded,
+  'world': Icons.public_rounded,
+};
+
+const _accountColors = <Color>[
+  AppTheme.colorTransfer,
+  AppTheme.colorIncome,
+  AppTheme.colorExpense,
+  AppTheme.colorWarning,
+  Color(0xFF6C63FF),
+  Color(0xFF00BCD4),
+  Color(0xFFFF6B9D),
+  Color(0xFFFF9800),
+  Color(0xFF8BC34A),
+  Color(0xFF9C27B0),
+];
+
+IconData getAccountIcon(String name) {
+  return _accountIcons[name] ?? Icons.account_balance_wallet_rounded;
+}
+
+Color getAccountColor(dom.Account acc) {
+  if (acc.color != null) {
+    return Color(
+      int.tryParse(acc.color!.replaceFirst('#', ''), radix: 16) ??
+          AppTheme.colorTransfer.toARGB32(),
+    );
+  }
+  return AppTheme.colorTransfer;
+}
+
 class AccountsPage extends ConsumerWidget {
   const AccountsPage({super.key});
+
+  /// Sort: cash/default first, then non-credit by balance desc, then credit cards by debt desc
+  List<dom.Account> _sortAccounts(List<dom.Account> accounts) {
+    final sorted = List<dom.Account>.from(accounts);
+    sorted.sort((a, b) {
+      // Default cash account always first
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+      // Non-credit cards before credit cards
+      if (!a.isCreditCard && b.isCreditCard) return -1;
+      if (a.isCreditCard && !b.isCreditCard) return 1;
+      // Within same type, sort by balance descending
+      if (a.isCreditCard && b.isCreditCard) {
+        return b.totalDebt.compareTo(a.totalDebt);
+      }
+      return b.balance.compareTo(a.balance);
+    });
+    return sorted;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final accountsAsync = ref.watch(accountsStreamProvider);
 
     return accountsAsync.when(
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, stack) => Scaffold(body: Center(child: Text('Error: $err'))),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (err, stack) =>
+          Scaffold(body: Center(child: Text('Error: $err'))),
       data: (accounts) {
+        final sorted = _sortAccounts(accounts);
         return Scaffold(
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
             title: Text(
               'Tus Cuentas',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 20),
+              style:
+                  GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 20),
             ),
           ),
           body: ListView.builder(
             padding: const EdgeInsets.all(20),
-            itemCount: accounts.length,
+            itemCount: sorted.length,
             itemBuilder: (context, index) {
-              final acc = accounts[index];
-              return InkWell(
+              final acc = sorted[index];
+              return _AccountCard(
+                account: acc,
                 onTap: () => context.push('/accounts/${acc.id}'),
-                borderRadius: BorderRadius.circular(24),
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E2C),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppTheme.colorTransfer.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(_getIconData(acc.icon ?? 'wallet'), color: AppTheme.colorTransfer),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  acc.name,
-                                  style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
-                                ),
-                                Text(
-                                  formatAmount(acc.balance),
-                                  style: GoogleFonts.inter(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                if (acc.pendingStatementAmount > 0) 
-                                  Text(
-                                    'Pendiente: ${formatAmount(acc.pendingStatementAmount)}',
-                                    style: TextStyle(color: AppTheme.colorExpense, fontSize: 10),
-                                  ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  acc.isCreditCard ? 'Gastos' : 'Actual',
-                                  style: TextStyle(color: AppTheme.colorTransfer, fontSize: 11, fontWeight: FontWeight.w600),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (acc.isCreditCard && acc.pendingStatementAmount > 0) ...[
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () => _showPayStatementDialog(context, ref, acc),
-                            icon: const Icon(Icons.payments_outlined, size: 16),
-                            label: const Text('Pagar Resumen'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.colorIncome,
-                              side: BorderSide(color: AppTheme.colorIncome.withValues(alpha: 0.5)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                onLongPress: () =>
+                    _showAccountOptions(context, ref, acc),
+                onPayStatement: acc.isCreditCard &&
+                        acc.pendingStatementAmount > 0
+                    ? () =>
+                        _showPayStatementDialog(context, ref, acc)
+                    : null,
               );
             },
           ),
           floatingActionButton: Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 100),
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).padding.bottom + 16),
             child: FloatingActionButton(
+              heroTag: null,
               onPressed: () => _showAddAccountDialog(context, ref),
               backgroundColor: AppTheme.colorTransfer,
               foregroundColor: Colors.white,
-              child: const Icon(Icons.add_rounded, size: 32),
+              elevation: 8,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18)),
+              child: const Icon(Icons.add_rounded, size: 28),
             ),
           ),
         );
@@ -123,99 +128,269 @@ class AccountsPage extends ConsumerWidget {
     );
   }
 
-  void _showAddAccountDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final aliasController = TextEditingController();
-    final cvuController = TextEditingController();
-    final balanceController = TextEditingController(text: '0');
-    String selectedType = 'Débito';
+  // ──────────────────────────────────────────────────────────────
+  // Long-press options bottom sheet
+  // ──────────────────────────────────────────────────────────────
+  void _showAccountOptions(
+      BuildContext context, WidgetRef ref, dom.Account acc) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF18181F),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(acc.name,
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    color: Colors.white)),
+            const SizedBox(height: 24),
+            ListTile(
+              leading:
+                  Icon(Icons.edit_rounded, color: AppTheme.colorTransfer),
+              title: const Text('Editar cuenta',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w500)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showEditAccountDialog(context, ref, acc);
+              },
+            ),
+            if (!acc.isDefault)
+              ListTile(
+                leading: Icon(Icons.delete_forever_rounded,
+                    color: AppTheme.colorExpense),
+                title: Text('Eliminar cuenta',
+                    style: TextStyle(
+                        color: AppTheme.colorExpense,
+                        fontWeight: FontWeight.w500)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (dCtx) => AlertDialog(
+                      backgroundColor: const Color(0xFF1E1E2C),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
+                      title: const Text('¿Eliminar cuenta?',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700)),
+                      content: Text(
+                        'Se eliminará "${acc.name}" permanentemente.',
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 14),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dCtx, false),
+                          child: const Text('Cancelar',
+                              style: TextStyle(color: Colors.white54)),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(dCtx, true),
+                          style: FilledButton.styleFrom(
+                              backgroundColor: AppTheme.colorExpense),
+                          child: const Text('Eliminar'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    await ref
+                        .read(accountServiceProvider)
+                        .deleteAccount(acc.id);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content:
+                                Text('"${acc.name}" eliminada')),
+                      );
+                    }
+                  }
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Edit account bottom sheet
+  // ──────────────────────────────────────────────────────────────
+  void _showEditAccountDialog(
+      BuildContext context, WidgetRef ref, dom.Account acc) {
+    final nameCtrl = TextEditingController(text: acc.name);
+    final aliasCtrl = TextEditingController(text: acc.alias ?? '');
+    final cvuCtrl = TextEditingController(text: acc.cvu ?? '');
+    String selectedIcon = acc.icon ?? 'wallet';
+    Color selectedColor = getAccountColor(acc);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setState) => Container(
-            padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 100),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => SingleChildScrollView(
+          child: Container(
+            padding: EdgeInsets.fromLTRB(
+                24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 32),
             decoration: const BoxDecoration(
               color: Color(0xFF18181F),
-              borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+              borderRadius:
+                  BorderRadius.vertical(top: Radius.circular(32)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Nueva Cuenta / Billetera',
-                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2)),
+                  ),
                 ),
                 const SizedBox(height: 24),
+                Text('Editar cuenta',
+                    style: GoogleFonts.inter(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white)),
+                const SizedBox(height: 24),
                 TextField(
-                  controller: nameController,
+                  controller: nameCtrl,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    labelText: 'Nombre / Institución',
-                    labelStyle: const TextStyle(color: AppTheme.colorTransfer),
-                    hintText: 'Ej. Mercado Pago, Efectivo, BBVA',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                    labelText: 'Nombre',
+                    labelStyle:
+                        const TextStyle(color: AppTheme.colorTransfer),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: aliasController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Alias (Opcional)',
-                    labelStyle: const TextStyle(color: AppTheme.colorTransfer),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: cvuController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'CBU / CVU (Opcional)',
-                    labelStyle: const TextStyle(color: AppTheme.colorTransfer),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: balanceController,
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Saldo Inicial',
-                          prefixText: r'$ ',
-                          labelStyle: const TextStyle(color: AppTheme.colorTransfer),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                const SizedBox(height: 20),
+                Text('Ícono',
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _accountIcons.entries.map((entry) {
+                    final isSelected = entry.key == selectedIcon;
+                    return GestureDetector(
+                      onTap: () =>
+                          setState(() => selectedIcon = entry.key),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? selectedColor.withValues(alpha: 0.2)
+                              : Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: isSelected
+                              ? Border.all(
+                                  color: selectedColor, width: 2)
+                              : null,
                         ),
+                        child: Icon(entry.value,
+                            color: isSelected
+                                ? selectedColor
+                                : Colors.white38,
+                            size: 20),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white10),
-                        borderRadius: BorderRadius.circular(16),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                Text('Color',
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _accountColors.map((color) {
+                    final isSelected =
+                        color.toARGB32() == selectedColor.toARGB32();
+                    return GestureDetector(
+                      onTap: () =>
+                          setState(() => selectedColor = color),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: isSelected
+                              ? Border.all(
+                                  color: Colors.white, width: 3)
+                              : null,
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check_rounded,
+                                color: Colors.white, size: 18)
+                            : null,
                       ),
-                      child: DropdownButton<String>(
-                        value: selectedType,
-                        dropdownColor: const Color(0xFF18181F),
-                        underline: const SizedBox(),
-                        style: const TextStyle(color: Colors.white),
-                        items: ['Débito', 'Crédito', 'Efectivo'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                        onChanged: (val) {
-                          if (val != null) setState(() => selectedType = val);
-                        },
-                      ),
-                    ),
-                  ],
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: aliasCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Alias (opcional)',
+                    labelStyle:
+                        const TextStyle(color: AppTheme.colorTransfer),
+                    hintText: 'Ej: mi.alias.mp',
+                    hintStyle: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.2)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: cvuCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'CVU / CBU (opcional)',
+                    labelStyle:
+                        const TextStyle(color: AppTheme.colorTransfer),
+                    hintText: 'Ej: 0000003100...',
+                    hintStyle: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.2)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
                 ),
                 const SizedBox(height: 32),
                 SizedBox(
@@ -223,33 +398,495 @@ class AccountsPage extends ConsumerWidget {
                   height: 52,
                   child: FilledButton(
                     onPressed: () async {
-                      if (nameController.text.isEmpty) return;
-                      
-                      final type = selectedType == 'Crédito' ? 'credit' : (selectedType == 'Efectivo' ? 'cash' : 'bank');
-                      
-                      await ref.read(accountServiceProvider).addAccount(
-                        name: nameController.text,
-                        type: type,
-                        currencyCode: 'ARS',
-                        initialBalance: double.tryParse(balanceController.text) ?? 0,
-                        iconName: type == 'credit' ? 'credit_card' : 'wallet',
-                      );
-                      
-                      if (context.mounted) {
+                      await ref
+                          .read(accountServiceProvider)
+                          .updateAccount(
+                            id: acc.id,
+                            name: nameCtrl.text.trim().isEmpty
+                                ? null
+                                : nameCtrl.text.trim(),
+                            iconName: selectedIcon,
+                            colorValue: selectedColor.toARGB32(),
+                            alias: aliasCtrl.text.trim().isEmpty
+                                ? null
+                                : aliasCtrl.text.trim(),
+                            clearAlias:
+                                aliasCtrl.text.trim().isEmpty,
+                            cvu: cvuCtrl.text.trim().isEmpty
+                                ? null
+                                : cvuCtrl.text.trim(),
+                            clearCvu: cvuCtrl.text.trim().isEmpty,
+                          );
+                      if (ctx.mounted) {
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Cuenta creada satisfactoriamente')),
+                          const SnackBar(
+                              content: Text('Cuenta actualizada')),
                         );
                       }
                     },
                     style: FilledButton.styleFrom(
                       backgroundColor: AppTheme.colorTransfer,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
                     ),
-                    child: const Text('Crear Cuenta', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                    child: const Text('Guardar',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16)),
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Add account bottom sheet
+  // ──────────────────────────────────────────────────────────────
+  void _showAddAccountDialog(BuildContext context, WidgetRef ref) {
+    final nameController = TextEditingController();
+    final balanceController = TextEditingController(text: '0');
+    final closingDayController = TextEditingController();
+    final dueDayController = TextEditingController();
+    final creditLimitController = TextEditingController();
+    final debtController = TextEditingController();
+    final aliasController = TextEditingController();
+    final cvuController = TextEditingController();
+    String selectedType = 'Débito';
+    String selectedIcon = 'wallet';
+    Color selectedColor = AppTheme.colorTransfer;
+    bool showAlias = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) => SingleChildScrollView(
+            child: Container(
+              padding: EdgeInsets.fromLTRB(
+                  24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 100),
+              decoration: const BoxDecoration(
+                color: Color(0xFF18181F),
+                borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(32),
+                    topRight: Radius.circular(32)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Nueva Cuenta / Billetera',
+                    style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white),
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: nameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Nombre / Institución',
+                      labelStyle:
+                          const TextStyle(color: AppTheme.colorTransfer),
+                      hintText: 'Ej. Mercado Pago, BBVA, Brubank',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: balanceController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: selectedType == 'Crédito'
+                                ? 'Gastos actuales'
+                                : 'Saldo Inicial',
+                            prefixText: r'$ ',
+                            labelStyle: const TextStyle(
+                                color: AppTheme.colorTransfer),
+                            border: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(16)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.white10),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: DropdownButton<String>(
+                          value: selectedType,
+                          dropdownColor: const Color(0xFF18181F),
+                          underline: const SizedBox(),
+                          style:
+                              const TextStyle(color: Colors.white),
+                          items: ['Débito', 'Crédito']
+                              .map((t) => DropdownMenuItem(
+                                  value: t, child: Text(t)))
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                selectedType = val;
+                                if (val == 'Crédito') {
+                                  selectedIcon = 'credit_card';
+                                } else {
+                                  selectedIcon = 'wallet';
+                                }
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Ícono y color
+                  const SizedBox(height: 20),
+                  Text('Ícono',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _accountIcons.entries.map((entry) {
+                      final isSelected =
+                          entry.key == selectedIcon;
+                      return GestureDetector(
+                        onTap: () => setState(
+                            () => selectedIcon = entry.key),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? selectedColor
+                                    .withValues(alpha: 0.2)
+                                : Colors.white
+                                    .withValues(alpha: 0.05),
+                            borderRadius:
+                                BorderRadius.circular(12),
+                            border: isSelected
+                                ? Border.all(
+                                    color: selectedColor,
+                                    width: 2)
+                                : null,
+                          ),
+                          child: Icon(entry.value,
+                              color: isSelected
+                                  ? selectedColor
+                                  : Colors.white38,
+                              size: 20),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Color',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _accountColors.map((color) {
+                      final isSelected = color.toARGB32() ==
+                          selectedColor.toARGB32();
+                      return GestureDetector(
+                        onTap: () => setState(
+                            () => selectedColor = color),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: isSelected
+                                ? Border.all(
+                                    color: Colors.white,
+                                    width: 3)
+                                : null,
+                          ),
+                          child: isSelected
+                              ? const Icon(Icons.check_rounded,
+                                  color: Colors.white, size: 18)
+                              : null,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                  // Alias/CVU toggle
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onTap: () =>
+                        setState(() => showAlias = !showAlias),
+                    child: Row(
+                      children: [
+                        Icon(
+                          showAlias
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
+                          color: AppTheme.colorTransfer,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Alias y CVU (opcional)',
+                          style: TextStyle(
+                              color: AppTheme.colorTransfer,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (showAlias) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: aliasController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Alias',
+                        labelStyle: const TextStyle(
+                            color: AppTheme.colorTransfer),
+                        hintText: 'Ej: mi.alias.mp',
+                        hintStyle: TextStyle(
+                            color:
+                                Colors.white.withValues(alpha: 0.2)),
+                        border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(16)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: cvuController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'CVU / CBU',
+                        labelStyle: const TextStyle(
+                            color: AppTheme.colorTransfer),
+                        hintText: 'Ej: 0000003100...',
+                        hintStyle: TextStyle(
+                            color:
+                                Colors.white.withValues(alpha: 0.2)),
+                        border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(16)),
+                      ),
+                    ),
+                  ],
+
+                  // Credit card fields
+                  if (selectedType == 'Crédito') ...[
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        const Icon(Icons.credit_card_rounded,
+                            color: AppTheme.colorTransfer,
+                            size: 16),
+                        const SizedBox(width: 8),
+                        Text('Fechas de la tarjeta',
+                            style: TextStyle(
+                                color: Colors.white
+                                    .withValues(alpha: 0.6),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: closingDayController,
+                            keyboardType: TextInputType.number,
+                            style:
+                                const TextStyle(color: Colors.white),
+                            decoration: InputDecoration(
+                              labelText: 'Día de cierre',
+                              hintText: 'Ej: 15',
+                              hintStyle: TextStyle(
+                                  color: Colors.white
+                                      .withValues(alpha: 0.2)),
+                              labelStyle: const TextStyle(
+                                  color: AppTheme.colorTransfer),
+                              border: OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(16)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: dueDayController,
+                            keyboardType: TextInputType.number,
+                            style:
+                                const TextStyle(color: Colors.white),
+                            decoration: InputDecoration(
+                              labelText: 'Día de vencimiento',
+                              hintText: 'Ej: 5',
+                              hintStyle: TextStyle(
+                                  color: Colors.white
+                                      .withValues(alpha: 0.2)),
+                              labelStyle: const TextStyle(
+                                  color: AppTheme.colorTransfer),
+                              border: OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(16)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: creditLimitController,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Límite de la tarjeta (opcional)',
+                        prefixText: r'$ ',
+                        hintText: 'Ej: 500000',
+                        hintStyle: TextStyle(
+                            color:
+                                Colors.white.withValues(alpha: 0.2)),
+                        labelStyle: const TextStyle(
+                            color: AppTheme.colorTransfer),
+                        border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(16)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: debtController,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Deuda actual (opcional)',
+                        prefixText: r'$ ',
+                        hintText: 'Ej: 120000',
+                        hintStyle: TextStyle(
+                            color:
+                                Colors.white.withValues(alpha: 0.2)),
+                        labelStyle:
+                            TextStyle(color: AppTheme.colorExpense),
+                        border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(16)),
+                        helperText:
+                            'Saldo pendiente de resúmenes anteriores',
+                        helperStyle: TextStyle(
+                            color:
+                                Colors.white.withValues(alpha: 0.3),
+                            fontSize: 11),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Estos días se repiten automáticamente cada mes.',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          fontSize: 11),
+                    ),
+                  ],
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      onPressed: () async {
+                        if (nameController.text.isEmpty) return;
+
+                        final type = selectedType == 'Crédito'
+                            ? 'credit'
+                            : 'bank';
+                        final debt =
+                            double.tryParse(debtController.text) ??
+                                0;
+
+                        await ref
+                            .read(accountServiceProvider)
+                            .addAccount(
+                              name: nameController.text,
+                              type: type,
+                              currencyCode: 'ARS',
+                              initialBalance: double.tryParse(
+                                      balanceController.text) ??
+                                  0,
+                              iconName: selectedIcon,
+                              colorValue:
+                                  selectedColor.toARGB32(),
+                              closingDay: type == 'credit'
+                                  ? int.tryParse(
+                                      closingDayController.text)
+                                  : null,
+                              dueDay: type == 'credit'
+                                  ? int.tryParse(
+                                      dueDayController.text)
+                                  : null,
+                              creditLimit: type == 'credit'
+                                  ? double.tryParse(
+                                      creditLimitController.text)
+                                  : null,
+                              pendingStatementAmount:
+                                  type == 'credit' ? debt : 0,
+                              alias: aliasController
+                                      .text.trim().isEmpty
+                                  ? null
+                                  : aliasController.text.trim(),
+                              cvu: cvuController
+                                      .text.trim().isEmpty
+                                  ? null
+                                  : cvuController.text.trim(),
+                            );
+
+                        if (context.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Cuenta creada satisfactoriamente')),
+                          );
+                        }
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppTheme.colorTransfer,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: const Text('Crear Cuenta',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16)),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -257,95 +894,295 @@ class AccountsPage extends ConsumerWidget {
     );
   }
 
-  void _showPayStatementDialog(BuildContext context, WidgetRef ref, dom.Account card) {
-    final allAccounts = ref.read(accountsStreamProvider).value ?? [];
-    final sources = allAccounts.where((a) => !a.isCreditCard).toList();
-    dom.Account? selectedSource = sources.isNotEmpty ? sources.first : null;
-    final amountController = TextEditingController(text: card.pendingStatementAmount.toStringAsFixed(0));
+  // ──────────────────────────────────────────────────────────────
+  // Pay statement dialog
+  // ──────────────────────────────────────────────────────────────
+  void _showPayStatementDialog(
+      BuildContext context, WidgetRef ref, dom.Account card) {
+    final allAccounts =
+        ref.read(accountsStreamProvider).value ?? [];
+    final sources =
+        allAccounts.where((a) => !a.isCreditCard).toList();
+    dom.Account? selectedSource =
+        sources.isNotEmpty ? sources.first : null;
+    final amountController = TextEditingController(
+        text: card.pendingStatementAmount.toStringAsFixed(0));
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        final bottomPadding = MediaQuery.of(ctx).viewInsets.bottom;
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Container(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding + 32),
-              decoration: const BoxDecoration(
-                color: Color(0xFF18181F),
-                borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Pagar Resumen: ${card.name}',
-                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
+        final bottomPadding =
+            MediaQuery.of(ctx).viewInsets.bottom;
+        return StatefulBuilder(builder: (context, setState) {
+          return Container(
+            padding: EdgeInsets.fromLTRB(
+                24, 24, 24, bottomPadding + 32),
+            decoration: const BoxDecoration(
+              color: Color(0xFF18181F),
+              borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(32),
+                  topRight: Radius.circular(32)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pagar Resumen: ${card.name}',
+                  style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white),
+                ),
+                const SizedBox(height: 16),
+                const Text('Seleccionar origen:',
+                    style: TextStyle(
+                        color: Colors.white54, fontSize: 13)),
+                const SizedBox(height: 8),
+                DropdownButton<dom.Account>(
+                  value: selectedSource,
+                  dropdownColor: const Color(0xFF1E1E2C),
+                  isExpanded: true,
+                  style: const TextStyle(color: Colors.white),
+                  items: sources
+                      .map((s) => DropdownMenuItem(
+                            value: s,
+                            child: Text(
+                                '${s.name} (${formatAmount(s.balance)})'),
+                          ))
+                      .toList(),
+                  onChanged: (val) =>
+                      setState(() => selectedSource = val),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 24),
+                  decoration: const InputDecoration(
+                    prefixText: r'$ ',
+                    labelText: 'Monto a pagar',
+                    labelStyle:
+                        TextStyle(color: AppTheme.colorTransfer),
+                    enabledBorder: UnderlineInputBorder(
+                        borderSide:
+                            BorderSide(color: Colors.white24)),
                   ),
-                  const SizedBox(height: 16),
-                  const Text('Seleccionar origen:', style: TextStyle(color: Colors.white54, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  DropdownButton<dom.Account>(
-                    value: selectedSource,
-                    dropdownColor: const Color(0xFF1E1E2C),
-                    isExpanded: true,
-                    style: const TextStyle(color: Colors.white),
-                    items: sources.map((s) => DropdownMenuItem(
-                      value: s,
-                      child: Text('${s.name} (${formatAmount(s.balance)})'),
-                    )).toList(),
-                    onChanged: (val) => setState(() => selectedSource = val),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton(
+                    onPressed: selectedSource == null
+                        ? null
+                        : () async {
+                            final amount = double.tryParse(
+                                    amountController.text) ??
+                                0;
+                            final srcId = selectedSource!.id;
+                            final txId = await ref
+                                .read(accountServiceProvider)
+                                .payCardStatement(
+                                  sourceAccountId: srcId,
+                                  cardAccountId: card.id,
+                                  amount: amount,
+                                );
+                            if (context.mounted) {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                      'Pago de \$${amount.toStringAsFixed(0)} registrado'),
+                                  duration: const Duration(seconds: 6),
+                                  action: SnackBarAction(
+                                    label: 'DESHACER',
+                                    textColor: AppTheme.colorWarning,
+                                    onPressed: () async {
+                                      await ref
+                                          .read(accountServiceProvider)
+                                          .undoPayCardStatement(
+                                            sourceAccountId: srcId,
+                                            cardAccountId: card.id,
+                                            amount: amount,
+                                            transactionId: txId,
+                                          );
+                                    },
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                    style: FilledButton.styleFrom(
+                        backgroundColor: AppTheme.colorIncome),
+                    child: const Text('Confirmar Pago',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold)),
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: amountController,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(color: Colors.white, fontSize: 24),
-                    decoration: const InputDecoration(
-                      prefixText: r'$ ',
-                      labelText: 'Monto a pagar',
-                      labelStyle: TextStyle(color: AppTheme.colorTransfer),
-                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: FilledButton(
-                      onPressed: selectedSource == null ? null : () async {
-                        final amount = double.tryParse(amountController.text) ?? 0;
-                        await ref.read(accountServiceProvider).payCardStatement(
-                          sourceAccountId: selectedSource!.id,
-                          cardAccountId: card.id,
-                          amount: amount,
-                        );
-                        if (context.mounted) {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Pago de resumen registrado.')),
-                          );
-                        }
-                      },
-                      style: FilledButton.styleFrom(backgroundColor: AppTheme.colorIncome),
-                      child: const Text('Confirmar Pago', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-        );
+                ),
+              ],
+            ),
+          );
+        });
       },
     );
   }
+}
 
-  IconData _getIconData(String name) {
-    if (name.contains('wallet')) return Icons.account_balance_wallet_rounded;
-    if (name.contains('bank') || name.contains('balance')) return Icons.account_balance_rounded;
-    return Icons.credit_card_rounded;
+// ──────────────────────────────────────────────────────────────
+// Account Card widget
+// ──────────────────────────────────────────────────────────────
+class _AccountCard extends StatelessWidget {
+  final dom.Account account;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+  final VoidCallback? onPayStatement;
+
+  const _AccountCard({
+    required this.account,
+    required this.onTap,
+    required this.onLongPress,
+    this.onPayStatement,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final acc = account;
+    final accColor = getAccountColor(acc);
+    final isDefault = acc.isDefault;
+
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E2C),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDefault
+                ? accColor.withValues(alpha: 0.3)
+                : Colors.white.withValues(alpha: 0.05),
+          ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: accColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                      getAccountIcon(acc.icon ?? 'wallet'),
+                      color: accColor),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              acc.name,
+                              style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isDefault) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color:
+                                    accColor.withValues(alpha: 0.15),
+                                borderRadius:
+                                    BorderRadius.circular(6),
+                              ),
+                              child: Text('Por defecto',
+                                  style: TextStyle(
+                                      color: accColor,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600)),
+                            ),
+                          ],
+                        ],
+                      ),
+                      Text(
+                        formatAmount(acc.balance),
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                      if (acc.pendingStatementAmount > 0)
+                        Text(
+                          'Deuda pendiente: ${formatAmount(acc.pendingStatementAmount)}',
+                          style: TextStyle(
+                              color: AppTheme.colorExpense,
+                              fontSize: 10),
+                        ),
+                      if (acc.alias != null &&
+                          acc.alias!.isNotEmpty)
+                        Text(
+                          acc.alias!,
+                          style: TextStyle(
+                              color: Colors.white
+                                  .withValues(alpha: 0.35),
+                              fontSize: 10),
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        acc.isCreditCard
+                            ? 'Tarjeta de crédito'
+                            : (acc.type == dom.AccountType.cash
+                                ? 'Efectivo'
+                                : 'Cuenta'),
+                        style: TextStyle(
+                            color: accColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (onPayStatement != null) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onPayStatement,
+                  icon: const Icon(Icons.payments_outlined,
+                      size: 16),
+                  label: const Text('Pagar Resumen'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.colorIncome,
+                    side: BorderSide(
+                        color: AppTheme.colorIncome
+                            .withValues(alpha: 0.5)),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }

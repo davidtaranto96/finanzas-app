@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_theme.dart';
 
 
-class MorePage extends StatelessWidget {
+class MorePage extends StatefulWidget {
   const MorePage({super.key});
+
+  @override
+  State<MorePage> createState() => _MorePageState();
+}
+
+class _MorePageState extends State<MorePage> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
 
   static final _items = [
     _MoreItem(
@@ -47,10 +56,11 @@ class MorePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Más')),
+      appBar: AppBar(title: Text('Más', style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w700))),
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: _items.length,

@@ -7,11 +7,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_providers.dart';
 import '../../../../core/logic/transaction_service.dart';
-import '../../../../core/utils/format_utils.dart';
 import '../../domain/models/wishlist_item.dart';
 import '../providers/wishlist_provider.dart';
 import '../widgets/add_wishlist_bottom_sheet.dart';
-import '../../../accounts/domain/models/account.dart' as dom_a;
 
 class WishlistPage extends ConsumerWidget {
   const WishlistPage({super.key});

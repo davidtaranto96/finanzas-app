@@ -49,6 +49,27 @@ class TransactionService {
       );
     });
   }
+
+  /// Updates title, amount, and/or note of an existing transaction.
+  Future<void> updateTransaction({
+    required String id,
+    String? title,
+    double? amount,
+    String? note,
+  }) async {
+    await (db.update(db.transactionsTable)..where((t) => t.id.equals(id))).write(
+      TransactionsTableCompanion(
+        title: title != null ? drift.Value(title) : const drift.Value.absent(),
+        amount: amount != null ? drift.Value(amount) : const drift.Value.absent(),
+        note: note != null ? drift.Value(note) : const drift.Value.absent(),
+      ),
+    );
+  }
+
+  /// Deletes a transaction.
+  Future<void> deleteTransaction(String id) async {
+    await (db.delete(db.transactionsTable)..where((t) => t.id.equals(id))).go();
+  }
 }
 
 final transactionServiceProvider = Provider<TransactionService>((ref) {

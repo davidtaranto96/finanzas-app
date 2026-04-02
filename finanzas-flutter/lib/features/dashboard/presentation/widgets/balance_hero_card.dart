@@ -5,25 +5,71 @@ import '../../../../core/utils/format_utils.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_progress_bar.dart';
 
-class BalanceHeroCard extends StatelessWidget {
+enum _HeroView { disponible, efectivo, deuda }
+
+class BalanceHeroCard extends StatefulWidget {
   final MonthlyBalance balance;
   final double safeBudget;
+  final double arsCash;
+  final double pendingCards;
 
   const BalanceHeroCard({
-    super.key, 
+    super.key,
     required this.balance,
     required this.safeBudget,
+    required this.arsCash,
+    required this.pendingCards,
   });
+
+  @override
+  State<BalanceHeroCard> createState() => _BalanceHeroCardState();
+}
+
+class _BalanceHeroCardState extends State<BalanceHeroCard> {
+  _HeroView _view = _HeroView.disponible;
+
+  double get _mainValue {
+    switch (_view) {
+      case _HeroView.disponible:
+        return widget.safeBudget;
+      case _HeroView.efectivo:
+        return widget.arsCash;
+      case _HeroView.deuda:
+        return widget.pendingCards;
+    }
+  }
+
+  String get _label {
+    switch (_view) {
+      case _HeroView.disponible:
+        return 'Disponible';
+      case _HeroView.efectivo:
+        return 'Efectivo total';
+      case _HeroView.deuda:
+        return 'Deuda tarjetas';
+    }
+  }
+
+  void _nextView() {
+    setState(() {
+      _view = _HeroView.values[(_view.index + 1) % _HeroView.values.length];
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final savingsRate = balance.savings.clamp(0.0, 1.0);
+    final savingsRate = widget.balance.savings.clamp(0.0, 1.0);
     final savingsColor = savingsRate > 0.2
         ? AppTheme.colorIncome
         : savingsRate > 0.05
             ? AppTheme.colorWarning
             : AppTheme.colorExpense;
+
+    final isNegative = _view == _HeroView.deuda ? false : _mainValue < 0;
+    final valueColor = _view == _HeroView.deuda
+        ? AppTheme.colorExpense
+        : (isNegative ? AppTheme.colorExpense : cs.onSurface);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -48,32 +94,51 @@ class BalanceHeroCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                   Text(
-                    'Presupuesto Libre Seguro',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
-                          letterSpacing: 0.5,
-                          fontWeight: FontWeight.w600,
-                        ),
+              GestureDetector(
+                onTap: _nextView,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: cs.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: cs.primary.withValues(alpha: 0.20)),
                   ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.info_outline_rounded, size: 14, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
-                ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _label,
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              letterSpacing: 0.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.swap_horiz_rounded, size: 14, color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
+                    ],
+                  ),
+                ),
               ),
               _buildSavingsBadge(savingsRate, savingsColor),
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            formatAmount(safeBudget),
-            style: GoogleFonts.inter(
-              fontSize: 42,
-              fontWeight: FontWeight.w800,
-              color: safeBudget >= 0 ? cs.onSurface : AppTheme.colorExpense,
-              letterSpacing: -1,
-              height: 1.0,
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: Align(
+              key: ValueKey(_view),
+              alignment: Alignment.centerLeft,
+              child: Text(
+                formatAmount(_mainValue),
+                style: GoogleFonts.inter(
+                  fontSize: 42,
+                  fontWeight: FontWeight.w800,
+                  color: valueColor,
+                  letterSpacing: -1,
+                  height: 1.0,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -83,28 +148,35 @@ class BalanceHeroCard extends StatelessWidget {
             height: 8,
           ),
           const SizedBox(height: 20),
-          
+
           // Fila de Estadísticas Detalladas
           Row(
             children: [
               _DetailStat(
-                label: 'Sueldo',
-                value: formatAmount(balance.income, compact: true),
+                label: 'Ingresos',
+                value: formatAmount(widget.balance.income, compact: true),
                 icon: Icons.payments_outlined,
                 color: AppTheme.colorIncome,
               ),
               _DetailStat(
                 label: 'Gastado',
-                value: formatAmount(balance.expense, compact: true),
+                value: formatAmount(widget.balance.expense, compact: true),
                 icon: Icons.shopping_cart_outlined,
                 color: AppTheme.colorExpense,
               ),
               _DetailStat(
                 label: 'Ahorro',
-                value: formatAmount(balance.income - balance.expense, compact: true),
+                value: formatAmount(widget.balance.income - widget.balance.expense, compact: true),
                 icon: Icons.savings_outlined,
                 color: AppTheme.colorTransfer,
               ),
+              if (widget.balance.pendingToRecover > 0)
+                _DetailStat(
+                  label: 'A recuperar',
+                  value: formatAmount(widget.balance.pendingToRecover, compact: true),
+                  icon: Icons.pending_outlined,
+                  color: AppTheme.colorWarning,
+                ),
             ],
           ),
         ],
@@ -160,62 +232,6 @@ class _DetailStat extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
-
-  const _StatChip({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: color.withValues(alpha: 0.2),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 6),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 10,
-                      ),
-                ),
-                Text(
-                  value,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -71,6 +71,8 @@ class Account extends Equatable {
     int? dueDay,
     double? pendingStatementAmount,
     DateTime? lastClosedDate,
+    String? alias,
+    String? cvu,
   }) {
     return Account(
       id: id ?? this.id,

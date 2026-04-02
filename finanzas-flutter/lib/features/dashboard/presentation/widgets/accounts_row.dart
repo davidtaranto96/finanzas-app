@@ -161,7 +161,7 @@ class _AddAccountCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return GestureDetector(
-      onTap: () {},
+      onTap: () => context.push('/accounts'),
       child: Container(
         width: 80,
         decoration: BoxDecoration(

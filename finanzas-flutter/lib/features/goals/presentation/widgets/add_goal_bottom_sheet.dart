@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/logic/goal_service.dart';
 import '../../domain/models/goal.dart';
 
-class AddGoalBottomSheet extends StatefulWidget {
+class AddGoalBottomSheet extends ConsumerStatefulWidget {
   final Goal? goalToEdit;
 
   const AddGoalBottomSheet({super.key, this.goalToEdit});
@@ -19,27 +21,20 @@ class AddGoalBottomSheet extends StatefulWidget {
   }
 
   @override
-  State<AddGoalBottomSheet> createState() => _AddGoalBottomSheetState();
+  ConsumerState<AddGoalBottomSheet> createState() => _AddGoalBottomSheetState();
 }
 
-class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
+class _AddGoalBottomSheetState extends ConsumerState<AddGoalBottomSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _targetController;
   DateTime? _deadline;
-  IconData _selectedIcon = Icons.flag_rounded;
+  String _selectedIconKey = 'flag';
   Color _selectedColor = AppTheme.colorTransfer;
+  bool _saving = false;
 
-  final List<IconData> _availableIcons = [
-    Icons.flag_rounded,
-    Icons.flight_takeoff_rounded,
-    Icons.home_rounded,
-    Icons.directions_car_rounded,
-    Icons.laptop_mac_rounded,
-    Icons.videogame_asset_rounded,
-    Icons.shopping_bag_rounded,
-    Icons.restaurant_rounded,
-    Icons.fitness_center_rounded,
-    Icons.savings_rounded,
+  static const List<String> _iconKeys = [
+    'flag', 'travel', 'home', 'car', 'laptop',
+    'game', 'shop', 'food', 'fitness', 'savings',
   ];
 
   final List<Color> _availableColors = [
@@ -60,8 +55,8 @@ class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
     _targetController = TextEditingController(
         text: g != null ? g.targetAmount.toInt().toString() : '');
     _deadline = g?.deadline;
-    _selectedIcon = g?.icon ?? Icons.flag_rounded;
-    _selectedColor = g?.color ?? AppTheme.colorTransfer;
+    _selectedIconKey = g?.iconName ?? 'flag';
+    _selectedColor = g != null ? Color(g.colorValue) : AppTheme.colorTransfer;
   }
 
   @override
@@ -91,10 +86,43 @@ class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
         );
       },
     );
-    if (picked != null) {
-      setState(() {
-        _deadline = picked;
-      });
+    if (picked != null) setState(() => _deadline = picked);
+  }
+
+  Future<void> _submit() async {
+    final name = _nameController.text.trim();
+    final amountText = _targetController.text.trim();
+    if (name.isEmpty || amountText.isEmpty) return;
+    final amount = double.tryParse(amountText);
+    if (amount == null || amount <= 0) return;
+
+    setState(() => _saving = true);
+    final service = ref.read(goalServiceProvider);
+    final isEditing = widget.goalToEdit != null;
+
+    try {
+      if (isEditing) {
+        await service.updateGoal(
+          widget.goalToEdit!.id,
+          name: name,
+          targetAmount: amount,
+          colorValue: _selectedColor.toARGB32(),
+          iconName: _selectedIconKey,
+          deadline: _deadline,
+          clearDeadline: _deadline == null,
+        );
+      } else {
+        await service.addGoal(
+          name: name,
+          targetAmount: amount,
+          colorValue: _selectedColor.toARGB32(),
+          iconName: _selectedIconKey,
+          deadline: _deadline,
+        );
+      }
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -102,15 +130,14 @@ class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
     final isEditing = widget.goalToEdit != null;
-
-    final hasDeadline = _deadline != null;
-    final monthsLeft = hasDeadline ? _deadline!.difference(DateTime.now()).inDays ~/ 30 : 0;
+    final currentIcon = Goal.iconMap[_selectedIconKey] ?? Icons.flag_rounded;
 
     return Container(
       padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding + 100),
       decoration: const BoxDecoration(
         color: Color(0xFF18181F),
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+        borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(32), topRight: Radius.circular(32)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -118,8 +145,10 @@ class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
         children: [
           Center(
             child: Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.white24, borderRadius: BorderRadius.circular(2)),
             ),
           ),
           const SizedBox(height: 24),
@@ -131,43 +160,56 @@ class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
                   color: _selectedColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(_selectedIcon, color: _selectedColor),
+                child: Icon(currentIcon, color: _selectedColor),
               ),
               const SizedBox(width: 12),
               Text(
                 isEditing ? 'Editar Objetivo' : 'Nuevo Objetivo',
-                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
+                style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          
-          // --- Iconos y Colores ---
+
+          // Íconos
           SizedBox(
             height: 44,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              itemCount: _availableIcons.length,
+              itemCount: _iconKeys.length,
               itemBuilder: (context, index) {
-                final icon = _availableIcons[index];
-                final isSelected = icon == _selectedIcon;
+                final key = _iconKeys[index];
+                final iconData = Goal.iconMap[key]!;
+                final isSelected = key == _selectedIconKey;
                 return GestureDetector(
-                  onTap: () => setState(() => _selectedIcon = icon),
+                  onTap: () => setState(() => _selectedIconKey = key),
                   child: Container(
                     margin: const EdgeInsets.only(right: 8),
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: isSelected ? _selectedColor.withValues(alpha: 0.2) : Colors.white.withAlpha(10),
+                      color: isSelected
+                          ? _selectedColor.withValues(alpha: 0.2)
+                          : Colors.white.withAlpha(10),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: isSelected ? _selectedColor : Colors.transparent),
+                      border: Border.all(
+                          color: isSelected
+                              ? _selectedColor
+                              : Colors.transparent),
                     ),
-                    child: Icon(icon, color: isSelected ? _selectedColor : Colors.white38, size: 20),
+                    child: Icon(iconData,
+                        color: isSelected ? _selectedColor : Colors.white38,
+                        size: 20),
                   ),
                 );
               },
             ),
           ),
           const SizedBox(height: 12),
+
+          // Colores
           SizedBox(
             height: 32,
             child: ListView.builder(
@@ -175,7 +217,7 @@ class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
               itemCount: _availableColors.length,
               itemBuilder: (context, index) {
                 final color = _availableColors[index];
-                final isSelected = color == _selectedColor;
+                final isSelected = color.toARGB32() == _selectedColor.toARGB32();
                 return GestureDetector(
                   onTap: () => setState(() => _selectedColor = color),
                   child: Container(
@@ -185,7 +227,9 @@ class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
                     decoration: BoxDecoration(
                       color: color,
                       shape: BoxShape.circle,
-                      border: isSelected ? Border.all(color: Colors.white, width: 2) : null,
+                      border: isSelected
+                          ? Border.all(color: Colors.white, width: 2)
+                          : null,
                     ),
                   ),
                 );
@@ -201,7 +245,8 @@ class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
               hintText: 'Ej. Viaje a Japón',
               labelText: 'Nombre del Objetivo',
               labelStyle: const TextStyle(color: AppTheme.colorTransfer),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
             ),
           ),
           const SizedBox(height: 16),
@@ -213,7 +258,8 @@ class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
               prefixText: '\$ ',
               labelText: 'Monto a Alcanzar',
               labelStyle: const TextStyle(color: AppTheme.colorTransfer),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
             ),
           ),
           const SizedBox(height: 16),
@@ -221,29 +267,40 @@ class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
             onTap: _pickDate,
             borderRadius: BorderRadius.circular(16),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
-                border: Border.all(color: AppTheme.colorTransfer.withValues(alpha: 0.5)),
+                border: Border.all(
+                    color: AppTheme.colorTransfer.withValues(alpha: 0.5)),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.calendar_month_rounded, color: AppTheme.colorTransfer),
+                  Icon(Icons.calendar_month_rounded,
+                      color: AppTheme.colorTransfer),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Fecha Límite', style: TextStyle(color: AppTheme.colorTransfer, fontSize: 12)),
+                        Text('Fecha Límite',
+                            style: TextStyle(
+                                color: AppTheme.colorTransfer, fontSize: 12)),
                         Text(
-                          hasDeadline 
-                            ? '${_deadline!.day}/${_deadline!.month}/${_deadline!.year}' 
-                            : 'Tocar para seleccionar',
-                          style: TextStyle(color: Colors.white, fontSize: 16),
+                          _deadline != null
+                              ? '${_deadline!.day}/${_deadline!.month}/${_deadline!.year}'
+                              : 'Tocar para seleccionar',
+                          style: const TextStyle(color: Colors.white, fontSize: 16),
                         ),
                       ],
                     ),
                   ),
+                  if (_deadline != null)
+                    GestureDetector(
+                      onTap: () => setState(() => _deadline = null),
+                      child: const Icon(Icons.close_rounded,
+                          size: 16, color: Colors.white38),
+                    ),
                 ],
               ),
             ),
@@ -253,13 +310,14 @@ class _AddGoalBottomSheetState extends State<AddGoalBottomSheet> {
             width: double.infinity,
             height: 52,
             child: FilledButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(isEditing ? 'Objetivo guardado' : 'Objetivo creado')),
-                );
-              },
-              child: Text(isEditing ? 'Guardar Cambios' : 'Crear Objetivo'),
+              onPressed: _saving ? null : _submit,
+              child: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : Text(isEditing ? 'Guardar Cambios' : 'Crear Objetivo'),
             ),
           ),
         ],

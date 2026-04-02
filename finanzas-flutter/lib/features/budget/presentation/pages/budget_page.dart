@@ -4,15 +4,37 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/logic/budget_service.dart';
 import '../../domain/models/budget.dart';
 import '../providers/budget_provider.dart';
 import '../widgets/add_budget_bottom_sheet.dart';
 
-class BudgetPage extends ConsumerWidget {
+class BudgetPage extends ConsumerStatefulWidget {
   const BudgetPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BudgetPage> createState() => _BudgetPageState();
+}
+
+class _BudgetPageState extends ConsumerState<BudgetPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  Future<void> _deleteBudget(Budget budget) async {
+    await ref
+        .read(budgetServiceProvider)
+        .deleteBudget(budget.id, budget.categoryId);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('"${budget.categoryName}" eliminado')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
     final fixedBudgets = ref.watch(fixedBudgetsProvider);
     final variableBudgets = ref.watch(variableBudgetsProvider);
     final totalSpent = ref.watch(totalBudgetSpentProvider);
@@ -54,6 +76,14 @@ class BudgetPage extends ConsumerWidget {
               ),
             ),
 
+            if (fixedBudgets.isEmpty && variableBudgets.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyBudget(
+                  onAdd: () => AddBudgetBottomSheet.show(context),
+                ),
+              ),
+
             if (fixedBudgets.isNotEmpty) ...[
               const SliverToBoxAdapter(
                 child: Padding(
@@ -74,7 +104,10 @@ class BudgetPage extends ConsumerWidget {
                   itemCount: fixedBudgets.length,
                   separatorBuilder: (context, index) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
-                    return _BudgetCategoryCard(budget: fixedBudgets[index]);
+                    return _BudgetCategoryCard(
+                      budget: fixedBudgets[index],
+                      onDelete: () => _deleteBudget(fixedBudgets[index]),
+                    );
                   },
                 ),
               ),
@@ -100,7 +133,10 @@ class BudgetPage extends ConsumerWidget {
                   itemCount: variableBudgets.length,
                   separatorBuilder: (context, index) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
-                    return _BudgetCategoryCard(budget: variableBudgets[index]);
+                    return _BudgetCategoryCard(
+                      budget: variableBudgets[index],
+                      onDelete: () => _deleteBudget(variableBudgets[index]),
+                    );
                   },
                 ),
               ),
@@ -113,13 +149,50 @@ class BudgetPage extends ConsumerWidget {
           ],
         ),
       ),
-      floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 120),
-        child: FloatingActionButton(
-          onPressed: () => AddBudgetBottomSheet.show(context),
-          backgroundColor: AppTheme.colorTransfer,
-          foregroundColor: Colors.white,
-          child: const Icon(Icons.add_rounded),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Empty state
+// ──────────────────────────────────────────────────────────────────
+class _EmptyBudget extends StatelessWidget {
+  final VoidCallback onAdd;
+  const _EmptyBudget({required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.donut_large_outlined, size: 64,
+                color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+            const SizedBox(height: 20),
+            Text('Sin presupuestos',
+                style: GoogleFonts.inter(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white)),
+            const SizedBox(height: 8),
+            Text(
+              'Definí límites de gasto por categoría para controlar tus finanzas.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 28),
+            FilledButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Crear presupuesto'),
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.colorTransfer,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
+            ),
+          ],
         ),
       ),
     );
@@ -239,8 +312,9 @@ class _BudgetSummaryCard extends StatelessWidget {
 // ──────────────────────────────────────────────────────────────────
 class _BudgetCategoryCard extends StatelessWidget {
   final Budget budget;
+  final VoidCallback onDelete;
 
-  const _BudgetCategoryCard({required this.budget});
+  const _BudgetCategoryCard({required this.budget, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -376,9 +450,7 @@ class _BudgetCategoryCard extends StatelessWidget {
             title: Text('Eliminar Presupuesto', style: TextStyle(color: AppTheme.colorExpense, fontWeight: FontWeight.w500)),
             onTap: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Presupuesto eliminado')),
-              );
+              onDelete();
             },
           ),
         ],

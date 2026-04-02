@@ -14,6 +14,7 @@ import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/wishlist/presentation/pages/wishlist_page.dart';
 import '../../features/accounts/presentation/pages/accounts_page.dart';
 import '../../features/accounts/presentation/pages/account_detail_page.dart';
+import '../../features/transactions/presentation/pages/transaction_detail_page.dart';
 import '../shell/app_shell.dart';
 
 /// Key del Navigator interno del ShellRoute — usado por AppShell para cerrar modales
@@ -23,39 +24,48 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/home',
     routes: [
-      ShellRoute(
-        navigatorKey: shellNavigatorKey,
-        builder: (context, state, child) => AppShell(child: child),
-        routes: [
-          GoRoute(
-            path: '/home',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: HomePage(),
-            ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) => AppShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/home',
+                builder: (context, state) => const HomePage(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/transactions',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: TransactionsPage(),
-            ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/transactions',
+                builder: (context, state) => const TransactionsPage(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/budget',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: BudgetPage(),
-            ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/budget',
+                builder: (context, state) => const BudgetPage(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/goals',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: GoalsPage(),
-            ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/goals',
+                builder: (context, state) => const GoalsPage(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/more',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: MorePage(),
-            ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/more',
+                builder: (context, state) => const MorePage(),
+              ),
+            ],
           ),
         ],
       ),
@@ -88,6 +98,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: '/transactions/:txId',
+        builder: (context, state) => TransactionDetailPage(
+          txId: state.pathParameters['txId']!,
+        ),
       ),
     ],
   );

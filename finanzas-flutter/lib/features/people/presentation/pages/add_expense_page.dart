@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_providers.dart';
@@ -26,7 +25,7 @@ class _AddExpensePageState extends ConsumerState<AddExpensePage> {
   dom_a.Account? _selectedAccount;
   bool _iPaid = true;
   String _splitType = 'equal'; // 'equal', 'only_me', 'only_them'
-  DateTime _selectedDate = DateTime.now();
+  final DateTime _selectedDate = DateTime.now();
 
   @override
   void dispose() {
@@ -77,9 +76,11 @@ class _AddExpensePageState extends ConsumerState<AddExpensePage> {
       
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar: $e')),
+        );
+      }
     }
   }
 

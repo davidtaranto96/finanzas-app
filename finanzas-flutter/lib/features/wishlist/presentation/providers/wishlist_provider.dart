@@ -38,6 +38,12 @@ class WishlistNotifier extends StateNotifier<List<WishlistItem>> {
   void updateItem(WishlistItem updatedItem) {
     state = state.map((item) => item.id == updatedItem.id ? updatedItem : item).toList();
   }
+
+  void markAsPurchased(String id) {
+    state = state.map((item) => item.id == id
+        ? item.copyWith(isPurchased: true, purchasedAt: DateTime.now())
+        : item).toList();
+  }
 }
 
 final mockWishlistProvider = StateNotifierProvider<WishlistNotifier, List<WishlistItem>>((ref) {

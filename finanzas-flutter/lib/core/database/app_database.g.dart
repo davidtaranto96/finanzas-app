@@ -98,6 +98,16 @@ class $AccountsTableTable extends AccountsTable
   late final GeneratedColumn<DateTime> lastClosedDate =
       GeneratedColumn<DateTime>('last_closed_date', aliasedName, true,
           type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _aliasMeta = const VerificationMeta('alias');
+  @override
+  late final GeneratedColumn<String> alias = GeneratedColumn<String>(
+      'alias', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _cvuMeta = const VerificationMeta('cvu');
+  @override
+  late final GeneratedColumn<String> cvu = GeneratedColumn<String>(
+      'cvu', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -112,7 +122,9 @@ class $AccountsTableTable extends AccountsTable
         closingDay,
         dueDay,
         pendingStatementAmount,
-        lastClosedDate
+        lastClosedDate,
+        alias,
+        cvu
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -195,6 +207,14 @@ class $AccountsTableTable extends AccountsTable
           lastClosedDate.isAcceptableOrUnknown(
               data['last_closed_date']!, _lastClosedDateMeta));
     }
+    if (data.containsKey('alias')) {
+      context.handle(
+          _aliasMeta, alias.isAcceptableOrUnknown(data['alias']!, _aliasMeta));
+    }
+    if (data.containsKey('cvu')) {
+      context.handle(
+          _cvuMeta, cvu.isAcceptableOrUnknown(data['cvu']!, _cvuMeta));
+    }
     return context;
   }
 
@@ -231,6 +251,10 @@ class $AccountsTableTable extends AccountsTable
           data['${effectivePrefix}pending_statement_amount'])!,
       lastClosedDate: attachedDatabase.typeMapping.read(
           DriftSqlType.dateTime, data['${effectivePrefix}last_closed_date']),
+      alias: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}alias']),
+      cvu: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cvu']),
     );
   }
 
@@ -254,6 +278,8 @@ class AccountEntity extends DataClass implements Insertable<AccountEntity> {
   final int? dueDay;
   final double pendingStatementAmount;
   final DateTime? lastClosedDate;
+  final String? alias;
+  final String? cvu;
   const AccountEntity(
       {required this.id,
       required this.name,
@@ -267,7 +293,9 @@ class AccountEntity extends DataClass implements Insertable<AccountEntity> {
       this.closingDay,
       this.dueDay,
       required this.pendingStatementAmount,
-      this.lastClosedDate});
+      this.lastClosedDate,
+      this.alias,
+      this.cvu});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -295,6 +323,12 @@ class AccountEntity extends DataClass implements Insertable<AccountEntity> {
     map['pending_statement_amount'] = Variable<double>(pendingStatementAmount);
     if (!nullToAbsent || lastClosedDate != null) {
       map['last_closed_date'] = Variable<DateTime>(lastClosedDate);
+    }
+    if (!nullToAbsent || alias != null) {
+      map['alias'] = Variable<String>(alias);
+    }
+    if (!nullToAbsent || cvu != null) {
+      map['cvu'] = Variable<String>(cvu);
     }
     return map;
   }
@@ -325,6 +359,9 @@ class AccountEntity extends DataClass implements Insertable<AccountEntity> {
       lastClosedDate: lastClosedDate == null && nullToAbsent
           ? const Value.absent()
           : Value(lastClosedDate),
+      alias:
+          alias == null && nullToAbsent ? const Value.absent() : Value(alias),
+      cvu: cvu == null && nullToAbsent ? const Value.absent() : Value(cvu),
     );
   }
 
@@ -346,6 +383,8 @@ class AccountEntity extends DataClass implements Insertable<AccountEntity> {
       pendingStatementAmount:
           serializer.fromJson<double>(json['pendingStatementAmount']),
       lastClosedDate: serializer.fromJson<DateTime?>(json['lastClosedDate']),
+      alias: serializer.fromJson<String?>(json['alias']),
+      cvu: serializer.fromJson<String?>(json['cvu']),
     );
   }
   @override
@@ -366,6 +405,8 @@ class AccountEntity extends DataClass implements Insertable<AccountEntity> {
       'pendingStatementAmount':
           serializer.toJson<double>(pendingStatementAmount),
       'lastClosedDate': serializer.toJson<DateTime?>(lastClosedDate),
+      'alias': serializer.toJson<String?>(alias),
+      'cvu': serializer.toJson<String?>(cvu),
     };
   }
 
@@ -382,7 +423,9 @@ class AccountEntity extends DataClass implements Insertable<AccountEntity> {
           Value<int?> closingDay = const Value.absent(),
           Value<int?> dueDay = const Value.absent(),
           double? pendingStatementAmount,
-          Value<DateTime?> lastClosedDate = const Value.absent()}) =>
+          Value<DateTime?> lastClosedDate = const Value.absent(),
+          Value<String?> alias = const Value.absent(),
+          Value<String?> cvu = const Value.absent()}) =>
       AccountEntity(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -399,6 +442,8 @@ class AccountEntity extends DataClass implements Insertable<AccountEntity> {
             pendingStatementAmount ?? this.pendingStatementAmount,
         lastClosedDate:
             lastClosedDate.present ? lastClosedDate.value : this.lastClosedDate,
+        alias: alias.present ? alias.value : this.alias,
+        cvu: cvu.present ? cvu.value : this.cvu,
       );
   AccountEntity copyWithCompanion(AccountsTableCompanion data) {
     return AccountEntity(
@@ -426,6 +471,8 @@ class AccountEntity extends DataClass implements Insertable<AccountEntity> {
       lastClosedDate: data.lastClosedDate.present
           ? data.lastClosedDate.value
           : this.lastClosedDate,
+      alias: data.alias.present ? data.alias.value : this.alias,
+      cvu: data.cvu.present ? data.cvu.value : this.cvu,
     );
   }
 
@@ -444,7 +491,9 @@ class AccountEntity extends DataClass implements Insertable<AccountEntity> {
           ..write('closingDay: $closingDay, ')
           ..write('dueDay: $dueDay, ')
           ..write('pendingStatementAmount: $pendingStatementAmount, ')
-          ..write('lastClosedDate: $lastClosedDate')
+          ..write('lastClosedDate: $lastClosedDate, ')
+          ..write('alias: $alias, ')
+          ..write('cvu: $cvu')
           ..write(')'))
         .toString();
   }
@@ -463,7 +512,9 @@ class AccountEntity extends DataClass implements Insertable<AccountEntity> {
       closingDay,
       dueDay,
       pendingStatementAmount,
-      lastClosedDate);
+      lastClosedDate,
+      alias,
+      cvu);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -480,7 +531,9 @@ class AccountEntity extends DataClass implements Insertable<AccountEntity> {
           other.closingDay == this.closingDay &&
           other.dueDay == this.dueDay &&
           other.pendingStatementAmount == this.pendingStatementAmount &&
-          other.lastClosedDate == this.lastClosedDate);
+          other.lastClosedDate == this.lastClosedDate &&
+          other.alias == this.alias &&
+          other.cvu == this.cvu);
 }
 
 class AccountsTableCompanion extends UpdateCompanion<AccountEntity> {
@@ -497,6 +550,8 @@ class AccountsTableCompanion extends UpdateCompanion<AccountEntity> {
   final Value<int?> dueDay;
   final Value<double> pendingStatementAmount;
   final Value<DateTime?> lastClosedDate;
+  final Value<String?> alias;
+  final Value<String?> cvu;
   final Value<int> rowid;
   const AccountsTableCompanion({
     this.id = const Value.absent(),
@@ -512,6 +567,8 @@ class AccountsTableCompanion extends UpdateCompanion<AccountEntity> {
     this.dueDay = const Value.absent(),
     this.pendingStatementAmount = const Value.absent(),
     this.lastClosedDate = const Value.absent(),
+    this.alias = const Value.absent(),
+    this.cvu = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AccountsTableCompanion.insert({
@@ -528,6 +585,8 @@ class AccountsTableCompanion extends UpdateCompanion<AccountEntity> {
     this.dueDay = const Value.absent(),
     this.pendingStatementAmount = const Value.absent(),
     this.lastClosedDate = const Value.absent(),
+    this.alias = const Value.absent(),
+    this.cvu = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         name = Value(name),
@@ -546,6 +605,8 @@ class AccountsTableCompanion extends UpdateCompanion<AccountEntity> {
     Expression<int>? dueDay,
     Expression<double>? pendingStatementAmount,
     Expression<DateTime>? lastClosedDate,
+    Expression<String>? alias,
+    Expression<String>? cvu,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -563,6 +624,8 @@ class AccountsTableCompanion extends UpdateCompanion<AccountEntity> {
       if (pendingStatementAmount != null)
         'pending_statement_amount': pendingStatementAmount,
       if (lastClosedDate != null) 'last_closed_date': lastClosedDate,
+      if (alias != null) 'alias': alias,
+      if (cvu != null) 'cvu': cvu,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -581,6 +644,8 @@ class AccountsTableCompanion extends UpdateCompanion<AccountEntity> {
       Value<int?>? dueDay,
       Value<double>? pendingStatementAmount,
       Value<DateTime?>? lastClosedDate,
+      Value<String?>? alias,
+      Value<String?>? cvu,
       Value<int>? rowid}) {
     return AccountsTableCompanion(
       id: id ?? this.id,
@@ -597,6 +662,8 @@ class AccountsTableCompanion extends UpdateCompanion<AccountEntity> {
       pendingStatementAmount:
           pendingStatementAmount ?? this.pendingStatementAmount,
       lastClosedDate: lastClosedDate ?? this.lastClosedDate,
+      alias: alias ?? this.alias,
+      cvu: cvu ?? this.cvu,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -644,6 +711,12 @@ class AccountsTableCompanion extends UpdateCompanion<AccountEntity> {
     if (lastClosedDate.present) {
       map['last_closed_date'] = Variable<DateTime>(lastClosedDate.value);
     }
+    if (alias.present) {
+      map['alias'] = Variable<String>(alias.value);
+    }
+    if (cvu.present) {
+      map['cvu'] = Variable<String>(cvu.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -666,6 +739,8 @@ class AccountsTableCompanion extends UpdateCompanion<AccountEntity> {
           ..write('dueDay: $dueDay, ')
           ..write('pendingStatementAmount: $pendingStatementAmount, ')
           ..write('lastClosedDate: $lastClosedDate, ')
+          ..write('alias: $alias, ')
+          ..write('cvu: $cvu, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2093,6 +2168,12 @@ class $GoalsTableTable extends GoalsTable
   late final GeneratedColumn<int> colorValue = GeneratedColumn<int>(
       'color_value', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _iconNameMeta =
+      const VerificationMeta('iconName');
+  @override
+  late final GeneratedColumn<String> iconName = GeneratedColumn<String>(
+      'icon_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _deadlineMeta =
       const VerificationMeta('deadline');
   @override
@@ -2101,7 +2182,7 @@ class $GoalsTableTable extends GoalsTable
       type: DriftSqlType.dateTime, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns =>
-      [id, name, targetAmount, currentAmount, colorValue, deadline];
+      [id, name, targetAmount, currentAmount, colorValue, iconName, deadline];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2145,6 +2226,10 @@ class $GoalsTableTable extends GoalsTable
     } else if (isInserting) {
       context.missing(_colorValueMeta);
     }
+    if (data.containsKey('icon_name')) {
+      context.handle(_iconNameMeta,
+          iconName.isAcceptableOrUnknown(data['icon_name']!, _iconNameMeta));
+    }
     if (data.containsKey('deadline')) {
       context.handle(_deadlineMeta,
           deadline.isAcceptableOrUnknown(data['deadline']!, _deadlineMeta));
@@ -2168,6 +2253,8 @@ class $GoalsTableTable extends GoalsTable
           .read(DriftSqlType.double, data['${effectivePrefix}current_amount'])!,
       colorValue: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}color_value'])!,
+      iconName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}icon_name']),
       deadline: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}deadline']),
     );
@@ -2185,6 +2272,7 @@ class GoalEntity extends DataClass implements Insertable<GoalEntity> {
   final double targetAmount;
   final double currentAmount;
   final int colorValue;
+  final String? iconName;
   final DateTime? deadline;
   const GoalEntity(
       {required this.id,
@@ -2192,6 +2280,7 @@ class GoalEntity extends DataClass implements Insertable<GoalEntity> {
       required this.targetAmount,
       required this.currentAmount,
       required this.colorValue,
+      this.iconName,
       this.deadline});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2201,6 +2290,9 @@ class GoalEntity extends DataClass implements Insertable<GoalEntity> {
     map['target_amount'] = Variable<double>(targetAmount);
     map['current_amount'] = Variable<double>(currentAmount);
     map['color_value'] = Variable<int>(colorValue);
+    if (!nullToAbsent || iconName != null) {
+      map['icon_name'] = Variable<String>(iconName);
+    }
     if (!nullToAbsent || deadline != null) {
       map['deadline'] = Variable<DateTime>(deadline);
     }
@@ -2214,6 +2306,9 @@ class GoalEntity extends DataClass implements Insertable<GoalEntity> {
       targetAmount: Value(targetAmount),
       currentAmount: Value(currentAmount),
       colorValue: Value(colorValue),
+      iconName: iconName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(iconName),
       deadline: deadline == null && nullToAbsent
           ? const Value.absent()
           : Value(deadline),
@@ -2229,6 +2324,7 @@ class GoalEntity extends DataClass implements Insertable<GoalEntity> {
       targetAmount: serializer.fromJson<double>(json['targetAmount']),
       currentAmount: serializer.fromJson<double>(json['currentAmount']),
       colorValue: serializer.fromJson<int>(json['colorValue']),
+      iconName: serializer.fromJson<String?>(json['iconName']),
       deadline: serializer.fromJson<DateTime?>(json['deadline']),
     );
   }
@@ -2241,6 +2337,7 @@ class GoalEntity extends DataClass implements Insertable<GoalEntity> {
       'targetAmount': serializer.toJson<double>(targetAmount),
       'currentAmount': serializer.toJson<double>(currentAmount),
       'colorValue': serializer.toJson<int>(colorValue),
+      'iconName': serializer.toJson<String?>(iconName),
       'deadline': serializer.toJson<DateTime?>(deadline),
     };
   }
@@ -2251,6 +2348,7 @@ class GoalEntity extends DataClass implements Insertable<GoalEntity> {
           double? targetAmount,
           double? currentAmount,
           int? colorValue,
+          Value<String?> iconName = const Value.absent(),
           Value<DateTime?> deadline = const Value.absent()}) =>
       GoalEntity(
         id: id ?? this.id,
@@ -2258,6 +2356,7 @@ class GoalEntity extends DataClass implements Insertable<GoalEntity> {
         targetAmount: targetAmount ?? this.targetAmount,
         currentAmount: currentAmount ?? this.currentAmount,
         colorValue: colorValue ?? this.colorValue,
+        iconName: iconName.present ? iconName.value : this.iconName,
         deadline: deadline.present ? deadline.value : this.deadline,
       );
   GoalEntity copyWithCompanion(GoalsTableCompanion data) {
@@ -2272,6 +2371,7 @@ class GoalEntity extends DataClass implements Insertable<GoalEntity> {
           : this.currentAmount,
       colorValue:
           data.colorValue.present ? data.colorValue.value : this.colorValue,
+      iconName: data.iconName.present ? data.iconName.value : this.iconName,
       deadline: data.deadline.present ? data.deadline.value : this.deadline,
     );
   }
@@ -2284,14 +2384,15 @@ class GoalEntity extends DataClass implements Insertable<GoalEntity> {
           ..write('targetAmount: $targetAmount, ')
           ..write('currentAmount: $currentAmount, ')
           ..write('colorValue: $colorValue, ')
+          ..write('iconName: $iconName, ')
           ..write('deadline: $deadline')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, targetAmount, currentAmount, colorValue, deadline);
+  int get hashCode => Object.hash(
+      id, name, targetAmount, currentAmount, colorValue, iconName, deadline);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2301,6 +2402,7 @@ class GoalEntity extends DataClass implements Insertable<GoalEntity> {
           other.targetAmount == this.targetAmount &&
           other.currentAmount == this.currentAmount &&
           other.colorValue == this.colorValue &&
+          other.iconName == this.iconName &&
           other.deadline == this.deadline);
 }
 
@@ -2310,6 +2412,7 @@ class GoalsTableCompanion extends UpdateCompanion<GoalEntity> {
   final Value<double> targetAmount;
   final Value<double> currentAmount;
   final Value<int> colorValue;
+  final Value<String?> iconName;
   final Value<DateTime?> deadline;
   final Value<int> rowid;
   const GoalsTableCompanion({
@@ -2318,6 +2421,7 @@ class GoalsTableCompanion extends UpdateCompanion<GoalEntity> {
     this.targetAmount = const Value.absent(),
     this.currentAmount = const Value.absent(),
     this.colorValue = const Value.absent(),
+    this.iconName = const Value.absent(),
     this.deadline = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2327,6 +2431,7 @@ class GoalsTableCompanion extends UpdateCompanion<GoalEntity> {
     required double targetAmount,
     this.currentAmount = const Value.absent(),
     required int colorValue,
+    this.iconName = const Value.absent(),
     this.deadline = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -2339,6 +2444,7 @@ class GoalsTableCompanion extends UpdateCompanion<GoalEntity> {
     Expression<double>? targetAmount,
     Expression<double>? currentAmount,
     Expression<int>? colorValue,
+    Expression<String>? iconName,
     Expression<DateTime>? deadline,
     Expression<int>? rowid,
   }) {
@@ -2348,6 +2454,7 @@ class GoalsTableCompanion extends UpdateCompanion<GoalEntity> {
       if (targetAmount != null) 'target_amount': targetAmount,
       if (currentAmount != null) 'current_amount': currentAmount,
       if (colorValue != null) 'color_value': colorValue,
+      if (iconName != null) 'icon_name': iconName,
       if (deadline != null) 'deadline': deadline,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2359,6 +2466,7 @@ class GoalsTableCompanion extends UpdateCompanion<GoalEntity> {
       Value<double>? targetAmount,
       Value<double>? currentAmount,
       Value<int>? colorValue,
+      Value<String?>? iconName,
       Value<DateTime?>? deadline,
       Value<int>? rowid}) {
     return GoalsTableCompanion(
@@ -2367,6 +2475,7 @@ class GoalsTableCompanion extends UpdateCompanion<GoalEntity> {
       targetAmount: targetAmount ?? this.targetAmount,
       currentAmount: currentAmount ?? this.currentAmount,
       colorValue: colorValue ?? this.colorValue,
+      iconName: iconName ?? this.iconName,
       deadline: deadline ?? this.deadline,
       rowid: rowid ?? this.rowid,
     );
@@ -2390,6 +2499,9 @@ class GoalsTableCompanion extends UpdateCompanion<GoalEntity> {
     if (colorValue.present) {
       map['color_value'] = Variable<int>(colorValue.value);
     }
+    if (iconName.present) {
+      map['icon_name'] = Variable<String>(iconName.value);
+    }
     if (deadline.present) {
       map['deadline'] = Variable<DateTime>(deadline.value);
     }
@@ -2407,6 +2519,7 @@ class GoalsTableCompanion extends UpdateCompanion<GoalEntity> {
           ..write('targetAmount: $targetAmount, ')
           ..write('currentAmount: $currentAmount, ')
           ..write('colorValue: $colorValue, ')
+          ..write('iconName: $iconName, ')
           ..write('deadline: $deadline, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -3013,6 +3126,318 @@ class GroupsTableCompanion extends UpdateCompanion<GroupEntity> {
   }
 }
 
+class $UserProfileTableTable extends UserProfileTable
+    with TableInfo<$UserProfileTableTable, UserProfileEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $UserProfileTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _monthlySalaryMeta =
+      const VerificationMeta('monthlySalary');
+  @override
+  late final GeneratedColumn<double> monthlySalary = GeneratedColumn<double>(
+      'monthly_salary', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _payDayMeta = const VerificationMeta('payDay');
+  @override
+  late final GeneratedColumn<int> payDay = GeneratedColumn<int>(
+      'pay_day', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, name, monthlySalary, payDay, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'user_profile_table';
+  @override
+  VerificationContext validateIntegrity(Insertable<UserProfileEntity> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    }
+    if (data.containsKey('monthly_salary')) {
+      context.handle(
+          _monthlySalaryMeta,
+          monthlySalary.isAcceptableOrUnknown(
+              data['monthly_salary']!, _monthlySalaryMeta));
+    }
+    if (data.containsKey('pay_day')) {
+      context.handle(_payDayMeta,
+          payDay.isAcceptableOrUnknown(data['pay_day']!, _payDayMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  UserProfileEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return UserProfileEntity(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name']),
+      monthlySalary: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}monthly_salary']),
+      payDay: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}pay_day']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $UserProfileTableTable createAlias(String alias) {
+    return $UserProfileTableTable(attachedDatabase, alias);
+  }
+}
+
+class UserProfileEntity extends DataClass
+    implements Insertable<UserProfileEntity> {
+  final String id;
+  final String? name;
+  final double? monthlySalary;
+  final int? payDay;
+  final DateTime createdAt;
+  const UserProfileEntity(
+      {required this.id,
+      this.name,
+      this.monthlySalary,
+      this.payDay,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || name != null) {
+      map['name'] = Variable<String>(name);
+    }
+    if (!nullToAbsent || monthlySalary != null) {
+      map['monthly_salary'] = Variable<double>(monthlySalary);
+    }
+    if (!nullToAbsent || payDay != null) {
+      map['pay_day'] = Variable<int>(payDay);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  UserProfileTableCompanion toCompanion(bool nullToAbsent) {
+    return UserProfileTableCompanion(
+      id: Value(id),
+      name: name == null && nullToAbsent ? const Value.absent() : Value(name),
+      monthlySalary: monthlySalary == null && nullToAbsent
+          ? const Value.absent()
+          : Value(monthlySalary),
+      payDay:
+          payDay == null && nullToAbsent ? const Value.absent() : Value(payDay),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory UserProfileEntity.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return UserProfileEntity(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String?>(json['name']),
+      monthlySalary: serializer.fromJson<double?>(json['monthlySalary']),
+      payDay: serializer.fromJson<int?>(json['payDay']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String?>(name),
+      'monthlySalary': serializer.toJson<double?>(monthlySalary),
+      'payDay': serializer.toJson<int?>(payDay),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  UserProfileEntity copyWith(
+          {String? id,
+          Value<String?> name = const Value.absent(),
+          Value<double?> monthlySalary = const Value.absent(),
+          Value<int?> payDay = const Value.absent(),
+          DateTime? createdAt}) =>
+      UserProfileEntity(
+        id: id ?? this.id,
+        name: name.present ? name.value : this.name,
+        monthlySalary:
+            monthlySalary.present ? monthlySalary.value : this.monthlySalary,
+        payDay: payDay.present ? payDay.value : this.payDay,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  UserProfileEntity copyWithCompanion(UserProfileTableCompanion data) {
+    return UserProfileEntity(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      monthlySalary: data.monthlySalary.present
+          ? data.monthlySalary.value
+          : this.monthlySalary,
+      payDay: data.payDay.present ? data.payDay.value : this.payDay,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UserProfileEntity(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('monthlySalary: $monthlySalary, ')
+          ..write('payDay: $payDay, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, monthlySalary, payDay, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is UserProfileEntity &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.monthlySalary == this.monthlySalary &&
+          other.payDay == this.payDay &&
+          other.createdAt == this.createdAt);
+}
+
+class UserProfileTableCompanion extends UpdateCompanion<UserProfileEntity> {
+  final Value<String> id;
+  final Value<String?> name;
+  final Value<double?> monthlySalary;
+  final Value<int?> payDay;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const UserProfileTableCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.monthlySalary = const Value.absent(),
+    this.payDay = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  UserProfileTableCompanion.insert({
+    required String id,
+    this.name = const Value.absent(),
+    this.monthlySalary = const Value.absent(),
+    this.payDay = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id);
+  static Insertable<UserProfileEntity> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<double>? monthlySalary,
+    Expression<int>? payDay,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (monthlySalary != null) 'monthly_salary': monthlySalary,
+      if (payDay != null) 'pay_day': payDay,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  UserProfileTableCompanion copyWith(
+      {Value<String>? id,
+      Value<String?>? name,
+      Value<double?>? monthlySalary,
+      Value<int?>? payDay,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return UserProfileTableCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      monthlySalary: monthlySalary ?? this.monthlySalary,
+      payDay: payDay ?? this.payDay,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (monthlySalary.present) {
+      map['monthly_salary'] = Variable<double>(monthlySalary.value);
+    }
+    if (payDay.present) {
+      map['pay_day'] = Variable<int>(payDay.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UserProfileTableCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('monthlySalary: $monthlySalary, ')
+          ..write('payDay: $payDay, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3025,6 +3450,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $GoalsTableTable goalsTable = $GoalsTableTable(this);
   late final $PersonsTableTable personsTable = $PersonsTableTable(this);
   late final $GroupsTableTable groupsTable = $GroupsTableTable(this);
+  late final $UserProfileTableTable userProfileTable =
+      $UserProfileTableTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3036,7 +3463,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         budgetsTable,
         goalsTable,
         personsTable,
-        groupsTable
+        groupsTable,
+        userProfileTable
       ];
 }
 
@@ -3055,6 +3483,8 @@ typedef $$AccountsTableTableCreateCompanionBuilder = AccountsTableCompanion
   Value<int?> dueDay,
   Value<double> pendingStatementAmount,
   Value<DateTime?> lastClosedDate,
+  Value<String?> alias,
+  Value<String?> cvu,
   Value<int> rowid,
 });
 typedef $$AccountsTableTableUpdateCompanionBuilder = AccountsTableCompanion
@@ -3072,6 +3502,8 @@ typedef $$AccountsTableTableUpdateCompanionBuilder = AccountsTableCompanion
   Value<int?> dueDay,
   Value<double> pendingStatementAmount,
   Value<DateTime?> lastClosedDate,
+  Value<String?> alias,
+  Value<String?> cvu,
   Value<int> rowid,
 });
 
@@ -3125,6 +3557,12 @@ class $$AccountsTableTableFilterComposer
   ColumnFilters<DateTime> get lastClosedDate => $composableBuilder(
       column: $table.lastClosedDate,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get alias => $composableBuilder(
+      column: $table.alias, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cvu => $composableBuilder(
+      column: $table.cvu, builder: (column) => ColumnFilters(column));
 }
 
 class $$AccountsTableTableOrderingComposer
@@ -3178,6 +3616,12 @@ class $$AccountsTableTableOrderingComposer
   ColumnOrderings<DateTime> get lastClosedDate => $composableBuilder(
       column: $table.lastClosedDate,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get alias => $composableBuilder(
+      column: $table.alias, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get cvu => $composableBuilder(
+      column: $table.cvu, builder: (column) => ColumnOrderings(column));
 }
 
 class $$AccountsTableTableAnnotationComposer
@@ -3227,6 +3671,12 @@ class $$AccountsTableTableAnnotationComposer
 
   GeneratedColumn<DateTime> get lastClosedDate => $composableBuilder(
       column: $table.lastClosedDate, builder: (column) => column);
+
+  GeneratedColumn<String> get alias =>
+      $composableBuilder(column: $table.alias, builder: (column) => column);
+
+  GeneratedColumn<String> get cvu =>
+      $composableBuilder(column: $table.cvu, builder: (column) => column);
 }
 
 class $$AccountsTableTableTableManager extends RootTableManager<
@@ -3268,6 +3718,8 @@ class $$AccountsTableTableTableManager extends RootTableManager<
             Value<int?> dueDay = const Value.absent(),
             Value<double> pendingStatementAmount = const Value.absent(),
             Value<DateTime?> lastClosedDate = const Value.absent(),
+            Value<String?> alias = const Value.absent(),
+            Value<String?> cvu = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               AccountsTableCompanion(
@@ -3284,6 +3736,8 @@ class $$AccountsTableTableTableManager extends RootTableManager<
             dueDay: dueDay,
             pendingStatementAmount: pendingStatementAmount,
             lastClosedDate: lastClosedDate,
+            alias: alias,
+            cvu: cvu,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -3300,6 +3754,8 @@ class $$AccountsTableTableTableManager extends RootTableManager<
             Value<int?> dueDay = const Value.absent(),
             Value<double> pendingStatementAmount = const Value.absent(),
             Value<DateTime?> lastClosedDate = const Value.absent(),
+            Value<String?> alias = const Value.absent(),
+            Value<String?> cvu = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               AccountsTableCompanion.insert(
@@ -3316,6 +3772,8 @@ class $$AccountsTableTableTableManager extends RootTableManager<
             dueDay: dueDay,
             pendingStatementAmount: pendingStatementAmount,
             lastClosedDate: lastClosedDate,
+            alias: alias,
+            cvu: cvu,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -4027,6 +4485,7 @@ typedef $$GoalsTableTableCreateCompanionBuilder = GoalsTableCompanion Function({
   required double targetAmount,
   Value<double> currentAmount,
   required int colorValue,
+  Value<String?> iconName,
   Value<DateTime?> deadline,
   Value<int> rowid,
 });
@@ -4036,6 +4495,7 @@ typedef $$GoalsTableTableUpdateCompanionBuilder = GoalsTableCompanion Function({
   Value<double> targetAmount,
   Value<double> currentAmount,
   Value<int> colorValue,
+  Value<String?> iconName,
   Value<DateTime?> deadline,
   Value<int> rowid,
 });
@@ -4063,6 +4523,9 @@ class $$GoalsTableTableFilterComposer
 
   ColumnFilters<int> get colorValue => $composableBuilder(
       column: $table.colorValue, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get iconName => $composableBuilder(
+      column: $table.iconName, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get deadline => $composableBuilder(
       column: $table.deadline, builder: (column) => ColumnFilters(column));
@@ -4094,6 +4557,9 @@ class $$GoalsTableTableOrderingComposer
   ColumnOrderings<int> get colorValue => $composableBuilder(
       column: $table.colorValue, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get iconName => $composableBuilder(
+      column: $table.iconName, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get deadline => $composableBuilder(
       column: $table.deadline, builder: (column) => ColumnOrderings(column));
 }
@@ -4121,6 +4587,9 @@ class $$GoalsTableTableAnnotationComposer
 
   GeneratedColumn<int> get colorValue => $composableBuilder(
       column: $table.colorValue, builder: (column) => column);
+
+  GeneratedColumn<String> get iconName =>
+      $composableBuilder(column: $table.iconName, builder: (column) => column);
 
   GeneratedColumn<DateTime> get deadline =>
       $composableBuilder(column: $table.deadline, builder: (column) => column);
@@ -4154,6 +4623,7 @@ class $$GoalsTableTableTableManager extends RootTableManager<
             Value<double> targetAmount = const Value.absent(),
             Value<double> currentAmount = const Value.absent(),
             Value<int> colorValue = const Value.absent(),
+            Value<String?> iconName = const Value.absent(),
             Value<DateTime?> deadline = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -4163,6 +4633,7 @@ class $$GoalsTableTableTableManager extends RootTableManager<
             targetAmount: targetAmount,
             currentAmount: currentAmount,
             colorValue: colorValue,
+            iconName: iconName,
             deadline: deadline,
             rowid: rowid,
           ),
@@ -4172,6 +4643,7 @@ class $$GoalsTableTableTableManager extends RootTableManager<
             required double targetAmount,
             Value<double> currentAmount = const Value.absent(),
             required int colorValue,
+            Value<String?> iconName = const Value.absent(),
             Value<DateTime?> deadline = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -4181,6 +4653,7 @@ class $$GoalsTableTableTableManager extends RootTableManager<
             targetAmount: targetAmount,
             currentAmount: currentAmount,
             colorValue: colorValue,
+            iconName: iconName,
             deadline: deadline,
             rowid: rowid,
           ),
@@ -4538,6 +5011,181 @@ typedef $$GroupsTableTableProcessedTableManager = ProcessedTableManager<
     ),
     GroupEntity,
     PrefetchHooks Function()>;
+typedef $$UserProfileTableTableCreateCompanionBuilder
+    = UserProfileTableCompanion Function({
+  required String id,
+  Value<String?> name,
+  Value<double?> monthlySalary,
+  Value<int?> payDay,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$UserProfileTableTableUpdateCompanionBuilder
+    = UserProfileTableCompanion Function({
+  Value<String> id,
+  Value<String?> name,
+  Value<double?> monthlySalary,
+  Value<int?> payDay,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$UserProfileTableTableFilterComposer
+    extends Composer<_$AppDatabase, $UserProfileTableTable> {
+  $$UserProfileTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get monthlySalary => $composableBuilder(
+      column: $table.monthlySalary, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get payDay => $composableBuilder(
+      column: $table.payDay, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$UserProfileTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $UserProfileTableTable> {
+  $$UserProfileTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get monthlySalary => $composableBuilder(
+      column: $table.monthlySalary,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get payDay => $composableBuilder(
+      column: $table.payDay, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$UserProfileTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $UserProfileTableTable> {
+  $$UserProfileTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<double> get monthlySalary => $composableBuilder(
+      column: $table.monthlySalary, builder: (column) => column);
+
+  GeneratedColumn<int> get payDay =>
+      $composableBuilder(column: $table.payDay, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$UserProfileTableTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $UserProfileTableTable,
+    UserProfileEntity,
+    $$UserProfileTableTableFilterComposer,
+    $$UserProfileTableTableOrderingComposer,
+    $$UserProfileTableTableAnnotationComposer,
+    $$UserProfileTableTableCreateCompanionBuilder,
+    $$UserProfileTableTableUpdateCompanionBuilder,
+    (
+      UserProfileEntity,
+      BaseReferences<_$AppDatabase, $UserProfileTableTable, UserProfileEntity>
+    ),
+    UserProfileEntity,
+    PrefetchHooks Function()> {
+  $$UserProfileTableTableTableManager(
+      _$AppDatabase db, $UserProfileTableTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$UserProfileTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$UserProfileTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$UserProfileTableTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String?> name = const Value.absent(),
+            Value<double?> monthlySalary = const Value.absent(),
+            Value<int?> payDay = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              UserProfileTableCompanion(
+            id: id,
+            name: name,
+            monthlySalary: monthlySalary,
+            payDay: payDay,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            Value<String?> name = const Value.absent(),
+            Value<double?> monthlySalary = const Value.absent(),
+            Value<int?> payDay = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              UserProfileTableCompanion.insert(
+            id: id,
+            name: name,
+            monthlySalary: monthlySalary,
+            payDay: payDay,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$UserProfileTableTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $UserProfileTableTable,
+    UserProfileEntity,
+    $$UserProfileTableTableFilterComposer,
+    $$UserProfileTableTableOrderingComposer,
+    $$UserProfileTableTableAnnotationComposer,
+    $$UserProfileTableTableCreateCompanionBuilder,
+    $$UserProfileTableTableUpdateCompanionBuilder,
+    (
+      UserProfileEntity,
+      BaseReferences<_$AppDatabase, $UserProfileTableTable, UserProfileEntity>
+    ),
+    UserProfileEntity,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4556,4 +5204,6 @@ class $AppDatabaseManager {
       $$PersonsTableTableTableManager(_db, _db.personsTable);
   $$GroupsTableTableTableManager get groupsTable =>
       $$GroupsTableTableTableManager(_db, _db.groupsTable);
+  $$UserProfileTableTableTableManager get userProfileTable =>
+      $$UserProfileTableTableTableManager(_db, _db.userProfileTable);
 }

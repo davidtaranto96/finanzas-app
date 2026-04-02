@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/app_database.dart';
 import '../database/database_providers.dart';
-import '../../features/accounts/domain/models/account.dart';
 import 'package:drift/drift.dart';
 
 class MonthClosureService {
@@ -35,7 +34,7 @@ class MonthClosureService {
     // 2. We skip budget duplication logic for now as it's mock-based in providers,
     // but in a real DB it would involve copying rows from one month to another.
     
-    print('Cierre de mes completado para $closingMonth');
+    // Cierre de mes completado para $closingMonth
   }
 }
 

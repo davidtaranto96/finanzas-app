@@ -165,7 +165,7 @@ class PeopleService {
         id: const Uuid().v4(),
         title: description,
         amount: amount,
-        type: iLent ? 'expense' : 'income',
+        type: iLent ? 'loanGiven' : 'loanReceived',
         categoryId: 'cat_peer_to_peer',
         accountId: accountId ?? (iLent ? 'cash_lent' : 'cash_borrowed'),
         date: txDate,

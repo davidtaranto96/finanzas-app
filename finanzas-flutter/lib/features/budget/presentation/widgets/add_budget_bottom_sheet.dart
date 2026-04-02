@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/logic/budget_service.dart';
 import '../../domain/models/budget.dart';
-import '../../../../core/utils/format_utils.dart'; // Just in case, though not strictly needed here
 
-
-class AddBudgetBottomSheet extends StatefulWidget {
+class AddBudgetBottomSheet extends ConsumerStatefulWidget {
   final Budget? budgetToEdit;
 
   const AddBudgetBottomSheet({super.key, this.budgetToEdit});
@@ -21,36 +21,44 @@ class AddBudgetBottomSheet extends StatefulWidget {
   }
 
   @override
-  State<AddBudgetBottomSheet> createState() => _AddBudgetBottomSheetState();
+  ConsumerState<AddBudgetBottomSheet> createState() =>
+      _AddBudgetBottomSheetState();
 }
 
-class _AddBudgetBottomSheetState extends State<AddBudgetBottomSheet> {
+class _AddBudgetBottomSheetState extends ConsumerState<AddBudgetBottomSheet> {
   late final TextEditingController _categoryController;
   late final TextEditingController _limitController;
   bool _isFixed = false;
-  IconData _selectedIcon = Icons.pie_chart_rounded;
+  String _selectedIconKey = 'pie_chart';
+  Color _selectedColor = AppTheme.colorTransfer;
+  bool _saving = false;
 
-  final List<IconData> _availableIcons = [
-    Icons.pie_chart_rounded,
-    Icons.shopping_cart_rounded,
-    Icons.restaurant_rounded,
-    Icons.directions_car_rounded,
-    Icons.home_rounded,
-    Icons.tv_rounded,
-    Icons.fitness_center_rounded,
-    Icons.health_and_safety_rounded,
-    Icons.school_rounded,
-    Icons.phone_iphone_rounded,
+  static const List<String> _iconKeys = [
+    'pie_chart', 'shopping_cart', 'restaurant', 'car', 'home',
+    'tv', 'fitness', 'health', 'education', 'phone',
+  ];
+
+  final List<Color> _availableColors = [
+    AppTheme.colorTransfer,
+    Colors.orangeAccent,
+    Colors.pinkAccent,
+    Colors.purpleAccent,
+    Colors.cyanAccent,
+    Colors.greenAccent,
+    Colors.amberAccent,
   ];
 
   @override
   void initState() {
     super.initState();
-    _categoryController = TextEditingController(text: widget.budgetToEdit?.categoryName ?? '');
+    final b = widget.budgetToEdit;
+    _categoryController = TextEditingController(text: b?.categoryName ?? '');
     _limitController = TextEditingController(
-        text: widget.budgetToEdit != null ? widget.budgetToEdit!.limitAmount.toInt().toString() : '');
-    _isFixed = widget.budgetToEdit?.isFixed ?? false;
-    _selectedIcon = widget.budgetToEdit?.icon ?? Icons.pie_chart_rounded;
+        text: b != null ? b.limitAmount.toInt().toString() : '');
+    _isFixed = b?.isFixed ?? false;
+    _selectedIconKey = b?.iconKey ?? 'pie_chart';
+    _selectedColor =
+        b != null ? Color(b.colorValue) : AppTheme.colorTransfer;
   }
 
   @override
@@ -60,10 +68,49 @@ class _AddBudgetBottomSheetState extends State<AddBudgetBottomSheet> {
     super.dispose();
   }
 
+  Future<void> _submit() async {
+    final name = _categoryController.text.trim();
+    final amountText = _limitController.text.trim();
+    if (name.isEmpty || amountText.isEmpty) return;
+    final amount = double.tryParse(amountText);
+    if (amount == null || amount <= 0) return;
+
+    setState(() => _saving = true);
+    final service = ref.read(budgetServiceProvider);
+    final isEditing = widget.budgetToEdit != null;
+
+    try {
+      if (isEditing) {
+        await service.updateBudget(
+          widget.budgetToEdit!.id,
+          widget.budgetToEdit!.categoryId,
+          categoryName: name,
+          limitAmount: amount,
+          isFixed: _isFixed,
+          colorValue: _selectedColor.toARGB32(),
+          iconKey: _selectedIconKey,
+        );
+      } else {
+        await service.addBudget(
+          categoryName: name,
+          limitAmount: amount,
+          isFixed: _isFixed,
+          colorValue: _selectedColor.toARGB32(),
+          iconKey: _selectedIconKey,
+        );
+      }
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
     final isEditing = widget.budgetToEdit != null;
+    final currentIcon =
+        Budget.iconMap[_selectedIconKey] ?? Icons.pie_chart_rounded;
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomPadding),
@@ -97,10 +144,10 @@ class _AddBudgetBottomSheetState extends State<AddBudgetBottomSheet> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppTheme.colorTransfer.withValues(alpha: 0.1),
+                      color: _selectedColor.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(_selectedIcon, color: AppTheme.colorTransfer),
+                    child: Icon(currentIcon, color: _selectedColor),
                   ),
                   const SizedBox(width: 12),
                   Text(
@@ -114,34 +161,67 @@ class _AddBudgetBottomSheetState extends State<AddBudgetBottomSheet> {
                 ],
               ),
               const SizedBox(height: 24),
-              
-              // --- Icon Picker ---
+
+              // Íconos
               SizedBox(
                 height: 48,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  itemCount: _availableIcons.length,
+                  itemCount: _iconKeys.length,
                   itemBuilder: (context, index) {
-                    final icon = _availableIcons[index];
-                    final isSelected = icon == _selectedIcon;
+                    final key = _iconKeys[index];
+                    final iconData = Budget.iconMap[key]!;
+                    final isSelected = key == _selectedIconKey;
                     return GestureDetector(
-                      onTap: () => setState(() => _selectedIcon = icon),
+                      onTap: () => setState(() => _selectedIconKey = key),
                       child: Container(
                         margin: const EdgeInsets.only(right: 12),
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? AppTheme.colorTransfer.withValues(alpha: 0.2)
+                              ? _selectedColor.withValues(alpha: 0.2)
                               : Colors.white.withAlpha(10),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isSelected ? AppTheme.colorTransfer : Colors.transparent,
+                            color: isSelected
+                                ? _selectedColor
+                                : Colors.transparent,
                           ),
                         ),
                         child: Icon(
-                          icon,
-                          color: isSelected ? AppTheme.colorTransfer : Colors.white38,
+                          iconData,
+                          color: isSelected ? _selectedColor : Colors.white38,
                           size: 20,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Colores
+              SizedBox(
+                height: 32,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _availableColors.length,
+                  itemBuilder: (context, index) {
+                    final color = _availableColors[index];
+                    final isSelected =
+                        color.toARGB32() == _selectedColor.toARGB32();
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedColor = color),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 12),
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: isSelected
+                              ? Border.all(color: Colors.white, width: 2)
+                              : null,
                         ),
                       ),
                     );
@@ -157,7 +237,8 @@ class _AddBudgetBottomSheetState extends State<AddBudgetBottomSheet> {
                   hintText: 'Ej. Supermercado',
                   labelText: 'Categoría',
                   labelStyle: const TextStyle(color: AppTheme.colorTransfer),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -169,14 +250,16 @@ class _AddBudgetBottomSheetState extends State<AddBudgetBottomSheet> {
                   prefixText: '\$ ',
                   labelText: 'Monto Límite',
                   labelStyle: const TextStyle(color: AppTheme.colorTransfer),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16)),
                 ),
               ),
               const SizedBox(height: 16),
               SwitchListTile(
                 title: const Text(
                   'Gasto Fijo / Suscripción',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w500),
                 ),
                 subtitle: const Text(
                   'Ej. Alquiler, Netflix, Internet',
@@ -192,15 +275,16 @@ class _AddBudgetBottomSheetState extends State<AddBudgetBottomSheet> {
                 width: double.infinity,
                 height: 52,
                 child: FilledButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(isEditing ? 'Presupuesto actualizado' : 'Presupuesto creado'),
-                      ),
-                    );
-                  },
-                  child: Text(isEditing ? 'Guardar Cambios' : 'Crear Presupuesto'),
+                  onPressed: _saving ? null : _submit,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : Text(isEditing
+                          ? 'Guardar Cambios'
+                          : 'Crear Presupuesto'),
                 ),
               ),
             ],
@@ -208,6 +292,5 @@ class _AddBudgetBottomSheetState extends State<AddBudgetBottomSheet> {
         ),
       ),
     );
-
   }
 }

@@ -8,25 +8,34 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_providers.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/providers/mock_data_provider.dart'; // For MonthlyBalance model
+import '../../../../core/database/app_database.dart';
 import '../widgets/balance_hero_card.dart';
 import '../widgets/card_alert_banner.dart';
 import '../widgets/accounts_row.dart';
 import '../widgets/recent_transactions_list.dart';
-import '../widgets/quick_stats_row.dart';
 import '../widgets/add_transaction_fab.dart';
 import '../../../transactions/domain/models/transaction.dart' as dom_tx;
-import '../../../../core/database/database_seeder.dart';
 
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
     final cs = Theme.of(context).colorScheme;
     
     // Real Data Streams
     final accountsAsync = ref.watch(accountsStreamProvider);
     final transactionsAsync = ref.watch(transactionsStreamProvider);
+    final userProfile = ref.watch(userProfileStreamProvider).valueOrNull;
     final syncStatus = ref.watch(_syncTimerProvider);
     final isSyncing = syncStatus.isLoading;
     
@@ -41,35 +50,58 @@ class HomePage extends ConsumerWidget {
             // Brain Calculation Logic
             if (accounts.isEmpty) {
               return Scaffold(
-                body: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.account_balance_wallet_outlined, size: 64, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
-                        const SizedBox(height: 24),
-                        Text('No hay cuentas configuradas', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: cs.onSurface)),
-                        const SizedBox(height: 12),
-                        Text('Parece que tu base de datos está vacía. Podés sembrar los datos de prueba del desarrollador para ver cómo funciona.', 
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant)),
-                        const SizedBox(height: 32),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: FilledButton.icon(
-                            onPressed: () async {
-                              final db = ref.read(databaseProvider);
-                              await DatabaseSeeder(db).clearAndSeedMockData();
-                              // El stream se actualizará automáticamente
-                            },
-                            icon: const Icon(Icons.auto_awesome),
-                            label: const Text('Sembrar datos de prueba'),
-                            style: FilledButton.styleFrom(backgroundColor: AppTheme.colorTransfer),
+                body: SafeArea(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: AppTheme.colorTransfer.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.account_balance_wallet_outlined,
+                                size: 56,
+                                color: AppTheme.colorTransfer.withValues(alpha: 0.8)),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 28),
+                          Text('¡Bienvenido!',
+                              style: GoogleFonts.inter(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white)),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Empezá agregando tu primera cuenta para ver tu resumen financiero.',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                                fontSize: 15, color: cs.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 32),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: FilledButton.icon(
+                              onPressed: () => context.push('/accounts'),
+                              icon: const Icon(Icons.add_rounded),
+                              label: const Text('Agregar cuenta'),
+                              style: FilledButton.styleFrom(
+                                  backgroundColor: AppTheme.colorTransfer),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'También podés ir a Movimientos para registrar tu primer gasto',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: cs.onSurfaceVariant.withValues(alpha: 0.6)),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -78,32 +110,43 @@ class HomePage extends ConsumerWidget {
 
             final arsCash = accounts.where((a) => a.currencyCode == 'ARS' && !a.isCreditCard)
                                    .fold(0.0, (sum, a) => sum + a.balance);
-            final mcAccount = accounts.any((a) => a.id == 'mc_credit') ? accounts.firstWhere((a) => a.id == 'mc_credit') : null;
-            final visaAccount = accounts.any((a) => a.id == 'visa_credit') ? accounts.firstWhere((a) => a.id == 'visa_credit') : null;
 
-            // Safe Budget = Cash - (Card Debts + Fixed Expenses Estimate)
-            final cardDebts = (mcAccount?.totalDebt ?? 0) + (visaAccount?.totalDebt ?? 0);
-            final safeBudget = arsCash - cardDebts - 317000;
+            // Pending credit card statements = real debt to discount from cash
+            final pendingCards = accounts
+                .where((a) => a.isCreditCard)
+                .fold(0.0, (sum, a) => sum + a.pendingStatementAmount);
+            final safeBudget = arsCash - pendingCards;
             
             // Calculate real MonthlyBalance for widgets
             final now = DateTime.now();
             final currentMonthTxs = transactions.where((t) => t.date.month == now.month && t.date.year == now.year).toList();
             final income = currentMonthTxs.where((t) => t.type == dom_tx.TransactionType.income).fold(0.0, (sum, t) => sum + t.amount);
             final expense = currentMonthTxs.where((t) => t.type == dom_tx.TransactionType.expense).fold(0.0, (sum, t) => sum + t.amount);
-            
+            final pendingToRecover = transactions
+                .where((t) => t.isShared)
+                .fold(0.0, (sum, t) => sum + t.pendingToRecover);
+
             final monthlyStats = MonthlyBalance(
-              income: income, 
-              expense: expense, 
-              pendingToRecover: 0,
+              income: income,
+              expense: expense,
+              pendingToRecover: pendingToRecover,
             );
             
-            final monthName = DateFormat('MMMM yyyy', 'es').format(now);
 
             return Scaffold(
               backgroundColor: cs.surface,
               body: Stack(
                 children: [
-                  CustomScrollView(
+                  RefreshIndicator(
+                    color: AppTheme.colorTransfer,
+                    backgroundColor: const Color(0xFF1E1E2C),
+                    displacement: 60,
+                    onRefresh: () async {
+                      ref.invalidate(accountsStreamProvider);
+                      ref.invalidate(transactionsStreamProvider);
+                      await Future.delayed(const Duration(milliseconds: 600));
+                    },
+                    child: CustomScrollView(
                     physics: const BouncingScrollPhysics(),
                     slivers: [
                       SliverAppBar(
@@ -150,16 +193,17 @@ class HomePage extends ConsumerWidget {
                           delegate: SliverChildListDelegate([
                             const SizedBox(height: 8),
                             BalanceHeroCard(
-                              balance: monthlyStats, 
+                              balance: monthlyStats,
                               safeBudget: safeBudget,
+                              arsCash: arsCash,
+                              pendingCards: pendingCards,
                             ),
                             const SizedBox(height: 12),
-
+                            if (userProfile?.payDay != null)
+                              _PaydayCountdown(profile: userProfile!),
                             const SizedBox(height: 12),
                             const _AlertsSection(),
                             
-                            const SizedBox(height: 12),
-                            QuickStatsRow(balance: monthlyStats),
                             const SizedBox(height: 20),
 
                             _SectionHeader(
@@ -184,7 +228,7 @@ class HomePage extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  
+                  ),
                   if (isSyncing)
                     const _SyncLoadingOverlay(progress: 0.8),
                 ],
@@ -245,7 +289,7 @@ class _SyncLoadingOverlay extends StatelessWidget {
 
 
 class _NotificationsBottomSheet extends ConsumerWidget {
-  const _NotificationsBottomSheet({super.key});
+  const _NotificationsBottomSheet();
 
   static void show(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
@@ -269,7 +313,7 @@ class _NotificationsBottomSheet extends ConsumerWidget {
     for (final card in accounts.where((a) => a.isCreditCard)) {
       if (card.closingDay != null) {
         final closing = DateTime(now.year, now.month, card.closingDay!);
-        if (closing.isAfter(now) && closing.difference(now).inDays <= 5) {
+        if (closing.isAfter(now) && closing.difference(now).inDays <= 7) {
           alerts.add({
             'title': 'Cierre de tarjeta: ${card.name}',
             'body': 'Cierra en ${closing.difference(now).inDays} días. Revisá tus gastos ordinarios.',
@@ -278,15 +322,18 @@ class _NotificationsBottomSheet extends ConsumerWidget {
           });
         }
       }
-      if (card.pendingStatementAmount > 0) {
-        final due = DateTime(now.year, now.month, card.dueDay ?? 1);
-        final overdue = due.isBefore(now);
-        alerts.add({
-          'title': overdue ? 'PAGO VENCIDO: ${card.name}' : 'Vencimiento: ${card.name}',
-          'body': 'Tenés un resumen de \$${formatAmount(card.pendingStatementAmount)} por pagar.',
-          'icon': overdue ? Icons.error_outline_rounded : Icons.warning_rounded,
-          'color': AppTheme.colorExpense,
-        });
+      if (card.pendingStatementAmount > 0 && card.dueDay != null) {
+        final due = DateTime(now.year, now.month, card.dueDay!);
+        final daysUntilDue = due.difference(now).inDays;
+        if (daysUntilDue <= 7) {
+          final overdue = due.isBefore(now);
+          alerts.add({
+            'title': overdue ? 'PAGO VENCIDO: ${card.name}' : 'Vencimiento: ${card.name}',
+            'body': 'Tenés un resumen de \$${formatAmount(card.pendingStatementAmount)} por pagar.',
+            'icon': overdue ? Icons.error_outline_rounded : Icons.warning_rounded,
+            'color': AppTheme.colorExpense,
+          });
+        }
       }
     }
 
@@ -367,6 +414,122 @@ class _NotificationsBottomSheet extends ConsumerWidget {
   }
 }
 
+class _PaydayCountdown extends StatelessWidget {
+  final UserProfileEntity profile;
+  const _PaydayCountdown({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final payDay = profile.payDay!;
+    final salary = profile.monthlySalary;
+    final fmt = NumberFormat.currency(symbol: '\$', decimalDigits: 0, locale: 'es_AR');
+
+    // Calculate next payday
+    DateTime nextPayday = DateTime(now.year, now.month, payDay.clamp(1, 28));
+    if (nextPayday.isBefore(now) || nextPayday.isAtSameMomentAs(now)) {
+      // If today IS payday, show special message
+      if (now.day == payDay) {
+        return _buildPaydayBanner(salary, fmt);
+      }
+      // Otherwise, next month
+      nextPayday = DateTime(now.year, now.month + 1, payDay.clamp(1, 28));
+    }
+
+    final daysLeft = nextPayday.difference(DateTime(now.year, now.month, now.day)).inDays;
+
+    final isClose = daysLeft <= 3;
+    final color = isClose ? AppTheme.colorIncome : AppTheme.colorTransfer;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.calendar_month_rounded, color: color, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  daysLeft == 1 ? '¡Mañana cobrás!' : 'Faltan $daysLeft días para cobrar',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                if (salary != null)
+                  Text(
+                    'Ingreso esperado: ${fmt.format(salary)}',
+                    style: GoogleFonts.inter(fontSize: 12, color: Colors.white54),
+                  ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '$daysLeft',
+              style: GoogleFonts.inter(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaydayBanner(double? salary, NumberFormat fmt) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppTheme.colorIncome.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.colorIncome.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.celebration_rounded, color: AppTheme.colorIncome, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '¡Hoy es día de cobro!',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.colorIncome,
+                  ),
+                ),
+                if (salary != null)
+                  Text(
+                    'Ingreso: ${fmt.format(salary)}',
+                    style: GoogleFonts.inter(fontSize: 12, color: Colors.white54),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AlertsSection extends ConsumerWidget {
   const _AlertsSection();
 
@@ -381,8 +544,9 @@ class _AlertsSection extends ConsumerWidget {
       if (card.closingDay != null) {
         final closingDate = DateTime(now.year, now.month, card.closingDay!);
         final diff = closingDate.difference(now).inDays;
-        if (diff >= 0 && diff <= 5) {
+        if (diff >= 0 && diff <= 7) {
           alerts.add(CardAlertBanner(
+            cardId: card.id,
             cardName: card.name,
             amount: card.balance,
             closingDate: closingDate,
@@ -391,15 +555,20 @@ class _AlertsSection extends ConsumerWidget {
           ));
         }
       }
-      
-      if (card.pendingStatementAmount > 0) {
-        alerts.add(CardAlertBanner(
-          cardName: card.name,
-          amount: card.pendingStatementAmount,
-          dueDate: DateTime(now.year, now.month, card.dueDay ?? 1),
-          closingDate: DateTime(now.year, now.month - 1, card.closingDay ?? 1),
-          isClosingSoon: false,
-        ));
+
+      if (card.pendingStatementAmount > 0 && card.dueDay != null) {
+        final dueDate = DateTime(now.year, now.month, card.dueDay!);
+        final daysUntilDue = dueDate.difference(now).inDays;
+        if (daysUntilDue <= 7) {
+          alerts.add(CardAlertBanner(
+            cardId: card.id,
+            cardName: card.name,
+            amount: card.pendingStatementAmount,
+            dueDate: dueDate,
+            closingDate: DateTime(now.year, now.month - 1, card.closingDay ?? 1),
+            isClosingSoon: false,
+          ));
+        }
       }
     }
 

@@ -1,5 +1,5 @@
-name: finanzas_app
-description: "App de finanzas personales — control total + decisiones conscientes + progreso visible"
+name: fint
+description: "Fint — tu app de finanzas personales: control total + decisiones conscientes + progreso visible"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -41,6 +41,11 @@ dependencies:
   file_picker: ^8.1.0
   syncfusion_flutter_pdf: ^33.1.46
 
+  # IA + Voz
+  speech_to_text: ^7.0.0
+  http: ^1.2.2
+  shared_preferences: ^2.3.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -50,6 +55,14 @@ dev_dependencies:
   riverpod_generator: ^2.6.1
   custom_lint: ^0.7.5
   riverpod_lint: ^2.6.1
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/app_icon.png"
+  adaptive_icon_background: "assets/app_icon.png"
+  adaptive_icon_foreground: "assets/app_icon.png"
 
 flutter:
   uses-material-design: true
