@@ -10,7 +10,7 @@ class CloudBackupService {
 
   CloudBackupService({required this.uid});
 
-  Reference get _backupRef => _storage.ref('backups/$uid/finanzas_app.sqlite');
+  Reference get _backupRef => _storage.ref('users/$uid/finanzas_app.sqlite');
 
   /// Sube el archivo SQLite local a Firebase Storage.
   /// Devuelve la fecha del backup realizado.
