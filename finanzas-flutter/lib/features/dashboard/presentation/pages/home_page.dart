@@ -376,14 +376,41 @@ class _SyncLoadingOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.black54,
+      color: const Color(0xFF0F0F1A).withValues(alpha: 0.85),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(color: AppTheme.colorTransfer),
-            const SizedBox(height: 16),
-            Text('Sincronizando con base de datos...', style: GoogleFonts.inter(color: Colors.white)),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: AppTheme.colorTransfer.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Sincronizando...',
+                    style: GoogleFonts.inter(
+                      color: Colors.white60,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

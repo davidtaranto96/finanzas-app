@@ -17,6 +17,7 @@ import '../../../transactions/presentation/pages/transactions_page.dart';
 import '../../../settings/presentation/pages/settings_page.dart'
     show showTabConfigSheet;
 import 'help_page.dart' show showHelpSheet;
+import '../../../../core/services/notification_service.dart';
 import '../widgets/my_qr_card.dart';
 
 class MorePage extends ConsumerStatefulWidget {
@@ -176,6 +177,8 @@ class _MorePageState extends ConsumerState<MorePage>
                   ),
                   child: Column(
                     children: [
+                      _NotificationRow(ref: ref),
+                      _divider(),
                       _CompactRow(
                         icon: Icons.settings_rounded,
                         label: 'Ajustes generales',
@@ -328,7 +331,25 @@ class _MorePageState extends ConsumerState<MorePage>
               ),
             ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 120)),
+            // ── Versión ──
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 20, bottom: 8),
+                child: Center(
+                  child: Text(
+                    'Sencillo · v1.4.1',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.15),
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
       ),
@@ -834,6 +855,70 @@ class _BackupRowState extends ConsumerState<_BackupRow> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Notification bell row with badge
+// ─────────────────────────────────────────────
+class _NotificationRow extends ConsumerWidget {
+  final WidgetRef ref;
+  const _NotificationRow({required this.ref});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unread = ref.watch(unreadNotificationCountProvider);
+    return InkWell(
+      onTap: () => context.push('/notifications'),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppTheme.colorWarning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(Icons.notifications_rounded,
+                  size: 18, color: AppTheme.colorWarning),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Notificaciones',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            if (unread > 0)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.colorExpense,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$unread',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded,
+                size: 18, color: Colors.white24),
+          ],
+        ),
       ),
     );
   }

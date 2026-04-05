@@ -34,7 +34,7 @@ class BackupUtils {
     dir ??= await getApplicationDocumentsDirectory();
 
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-    final backupName = 'Fint_Backup_$timestamp.sqlite';
+    final backupName = 'Sencillo_Backup_$timestamp.sqlite';
     final backupPath = p.join(dir.path, backupName);
     await dbFile.copy(backupPath);
 

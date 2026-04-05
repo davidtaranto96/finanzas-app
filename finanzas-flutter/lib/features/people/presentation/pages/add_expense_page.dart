@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import 'package:uuid/uuid.dart';
+
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_providers.dart';
 import '../../../../core/logic/people_service.dart';
+import '../../../../core/services/firestore_service.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../accounts/domain/models/account.dart' as dom_a;
 import '../../domain/models/person.dart' as dom_p;
@@ -101,19 +104,39 @@ class _AddExpensePageState extends ConsumerState<AddExpensePage> {
     if (totalAmount <= 0) return;
 
     try {
+      final description = _descriptionController.text.isNotEmpty
+          ? _descriptionController.text
+          : 'Gasto compartido';
+
       await ref.read(peopleServiceProvider).recordSharedExpense(
         personId: _selectedPerson!.id,
         totalAmount: totalAmount,
         iPaid: _iPaid,
         ownAmount: _ownAmount,
         otherAmount: _otherAmount,
-        description: _descriptionController.text.isNotEmpty
-            ? _descriptionController.text
-            : 'Gasto compartido',
+        description: description,
         accountId: _iPaid ? _selectedAccount?.id : null,
         groupId: _selectedGroup?.id,
         date: _selectedDate,
       );
+
+      // Sincronizar a Firestore si la persona está vinculada
+      if (_selectedPerson!.isLinked) {
+        try {
+          final firestoreService = ref.read(firestoreServiceProvider);
+          await firestoreService.createSharedExpense(
+            expenseId: const Uuid().v4(),
+            friendUid: _selectedPerson!.linkedUserId!,
+            title: description,
+            totalAmount: totalAmount,
+            myAmount: _ownAmount,
+            friendAmount: _otherAmount,
+            date: _selectedDate,
+          );
+        } catch (_) {
+          // Sync failure is non-blocking — local data is saved
+        }
+      }
 
       if (mounted) Navigator.pop(context);
     } catch (e) {

@@ -21,11 +21,113 @@ class NovedadesPage extends StatelessWidget {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         children: [
+          // v1.4.1
+          _VersionCard(
+            version: 'v1.4.1',
+            date: '5 Abr 2026',
+            isCurrent: true,
+            items: const [
+              _ChangeItem(icon: Icons.sync_rounded, text: 'Gastos compartidos ahora se sincronizan con amigos vinculados por Firestore', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.person_add_rounded, text: 'Aceptar solicitud de amistad crea la persona automáticamente si no existe', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.handshake_rounded, text: 'Liquidar deuda notifica al amigo vinculado en tiempo real', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.photo_rounded, text: 'Perfil de amigo vinculado muestra foto de Google y badge "Vinculado"', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.badge_rounded, text: 'Gastos entrantes usan el nombre real del sender en vez de "Amigo"', type: _ChangeType.fix),
+            ],
+          ),
+
+          // v1.4.0
+          _VersionCard(
+            version: 'v1.4.0',
+            date: '5 Abr 2026',
+            items: const [
+              _ChangeItem(icon: Icons.login_rounded, text: 'Login rediseñado: Google, cuenta local o datos demo', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.school_rounded, text: 'Onboarding mejorado: 10 slides, sin modal, directo al login', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.cloud_sync_rounded, text: 'Conectar Google desde Configuración si empezaste sin cuenta', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.cloud_download_rounded, text: 'Auto-restauración de backup al iniciar sesión con Google', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.notifications_active_rounded, text: 'Notificaciones push: vencimientos y recordatorios de deudas', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.volume_up_rounded, text: 'Sonidos y háptica controlados por switch en toda la app', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.edit_rounded, text: 'App renombrada a Sencillo en todo el proyecto y GitHub', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.delete_forever_rounded, text: '"Borrar datos" ahora cierra sesión y vuelve al login', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.replay_rounded, text: 'Botón "Ver tutorial" disponible desde la pantalla de login', type: _ChangeType.feature),
+            ],
+          ),
+
+          // v1.3.6
+
+          // v1.3.5 (merged into v1.3.6)
+
+          // v1.3.4
+          _VersionCard(
+            version: 'v1.3.4',
+            date: '5 Abr 2026',
+            items: const [
+              _ChangeItem(icon: Icons.credit_card_rounded, text: 'Fix: lista de cuentas ahora muestra gastos del período igual que el detalle', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.calculate_rounded, text: 'Disponible de tarjetas calculado por ciclo de facturación, no balance total', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.vibration_rounded, text: 'Háptica controlada por switch en Configuración en toda la app', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.auto_awesome_rounded, text: 'Login: ícono integrado sin bordes, partículas sutiles, ripple al tocar', type: _ChangeType.improvement),
+            ],
+          ),
+
+          // v1.3.3
+          _VersionCard(
+            version: 'v1.3.3',
+            date: '5 Abr 2026',
+            items: const [
+              _ChangeItem(icon: Icons.sync_alt_rounded, text: 'Fix: cambiar cuenta de un movimiento actualiza saldo en ambas cuentas', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.edit_rounded, text: 'Fix: editar una cuenta (nombre, saldo, etc.) ahora se refleja al instante', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.animation_rounded, text: 'FAB se transforma entre todas las pestañas del navbar, sin solapamiento', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.image_rounded, text: 'Ícono del login se integra sin bordes con el fondo', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.credit_card_rounded, text: '"Gastos del período" ahora muestra solo el ciclo de facturación actual', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.touch_app_rounded, text: 'Login: efecto ripple interactivo al tocar la pantalla', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.auto_awesome_rounded, text: 'Login: 18 partículas flotantes con brillo y órbitas variadas', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.vibration_rounded, text: 'Configuración: switch para activar/desactivar háptica y sonidos', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.qr_code_rounded, text: 'QR card: nombre completo visible, botones en fila separada', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.text_fields_rounded, text: 'App renombrada a "Sencillo" con tipografía Quicksand', type: _ChangeType.improvement),
+            ],
+          ),
+
+          // v1.3.2
+          _VersionCard(
+            version: 'v1.3.2',
+            date: '5 Abr 2026',
+            items: const [
+              _ChangeItem(icon: Icons.edit_rounded, text: 'Fix: editar gastos compartidos ahora guarda cuenta, categoría y fecha', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.layers_clear_rounded, text: 'Fix: FAB ya no se solapa en cuentas cuando está fijada en el navbar', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.login_rounded, text: 'Login rediseñado: logo más grande, fuente Poppins, botón con gradiente', type: _ChangeType.improvement),
+            ],
+          ),
+
+          // v1.3.1
+          _VersionCard(
+            version: 'v1.3.1',
+            date: '5 Abr 2026',
+            items: const [
+              _ChangeItem(icon: Icons.credit_card_rounded, text: 'Fix: tarjetas de crédito ya no muestran valores negativos', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.expand_more_rounded, text: 'Cuotas pendientes: widget colapsable con resumen compacto', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.auto_awesome_rounded, text: 'Splash animado con ícono de la app, efectos de brillo y partículas', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.sync_rounded, text: 'Overlay de sincronización rediseñado, más limpio', type: _ChangeType.improvement),
+            ],
+          ),
+
+          // v1.3.0
+          _VersionCard(
+            version: 'v1.3.0',
+            date: '5 Abr 2026',
+            items: const [
+              _ChangeItem(icon: Icons.person_rounded, text: 'Mi Perfil: card con avatar, nombre y código en Más', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.qr_code_rounded, text: 'QR colapsable: botones Mostrar QR y Escanear', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.edit_rounded, text: 'Fix: editar movimiento ahora guarda todos los cambios correctamente', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.refresh_rounded, text: 'Fix: refresh del dólar muestra timestamp correcto', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.animation_rounded, text: 'Fix: FAB ya no se oculta al cambiar de pestaña, transición suave', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.qr_code_scanner_rounded, text: 'Personas: opción "Escanear QR de amigo" en el menú +', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.info_outline_rounded, text: 'Versión de la app visible en el menú Más', type: _ChangeType.improvement),
+            ],
+          ),
+
           // v1.2.0
           _VersionCard(
             version: 'v1.2.0',
             date: '5 Abr 2026',
-            isCurrent: true,
             items: const [
               _ChangeItem(icon: Icons.refresh_rounded, text: 'Cotización del dólar: botón refresh manual + auto-refresh cada 15 min', type: _ChangeType.feature),
               _ChangeItem(icon: Icons.rocket_launch_rounded, text: 'Pantalla de Novedades con historial de versiones', type: _ChangeType.feature),
@@ -123,8 +225,9 @@ class NovedadesPage extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
+                _RoadmapItem(text: 'Wishlist compartida: que tus amigos vean qué regalarte', icon: Icons.card_giftcard_rounded),
+                _RoadmapItem(text: 'Ahorro compartido: metas grupales con amigos', icon: Icons.group_work_rounded),
                 _RoadmapItem(text: 'Exportar reportes a PDF', icon: Icons.picture_as_pdf_rounded),
-                _RoadmapItem(text: 'Notificaciones push de alertas', icon: Icons.notifications_rounded),
                 _RoadmapItem(text: 'Widgets de pantalla de inicio', icon: Icons.widgets_rounded),
                 _RoadmapItem(text: 'Sincronización multi-dispositivo', icon: Icons.sync_rounded),
                 _RoadmapItem(text: 'Modo claro / tema personalizable', icon: Icons.palette_rounded),

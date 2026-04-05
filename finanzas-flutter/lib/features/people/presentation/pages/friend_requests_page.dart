@@ -83,13 +83,24 @@ class _FriendRequestCardState extends ConsumerState<_FriendRequestCard> {
       final firestoreService = ref.read(firestoreServiceProvider);
       await firestoreService.acceptFriendRequest(widget.request.docId);
 
-      // Vincular persona local si existe con ese nombre
+      final peopleService = ref.read(peopleServiceProvider);
       final people = ref.read(peopleStreamProvider).valueOrNull ?? [];
       final name = widget.request.senderDisplayName.toLowerCase();
-      final match = people.where((p) => p.name.toLowerCase() == name).toList();
+
+      // Buscar persona local con ese nombre o linkedUserId
+      final match = people.where((p) =>
+          p.linkedUserId == widget.request.senderUid ||
+          p.name.toLowerCase() == name).toList();
+
       if (match.isNotEmpty) {
-        final peopleService = ref.read(peopleServiceProvider);
+        // Vincular persona existente
         await peopleService.setLinkedUser(match.first.id, widget.request.senderUid);
+      } else {
+        // Crear persona nueva con el nombre del amigo
+        final newId = await peopleService.addPerson(
+          name: widget.request.senderDisplayName,
+        );
+        await peopleService.setLinkedUser(newId, widget.request.senderUid);
       }
 
       if (mounted) {

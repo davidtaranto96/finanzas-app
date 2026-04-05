@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '../../../../core/providers/feedback_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/logic/transaction_service.dart';
@@ -439,6 +440,8 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
   // Confirmar y ejecutar escenario
   // ─────────────────────────────────────────────
   Future<void> _confirmParsed(NLTransaction tx) async {
+    appHaptic(ref, type: HapticType.medium);
+    appSound(ref, type: SoundType.success);
     final amount = tx.amount ?? 0;
 
     // Scenarios that don't need an amount
@@ -824,6 +827,8 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
   // ─────────────────────────────────────────────
   void _saveManualTransaction() async {
     if (_amountController.text.isEmpty || _selectedAccount == null) return;
+    appHaptic(ref, type: HapticType.medium);
+    appSound(ref, type: SoundType.success);
     final amount = parseFormattedAmount(_amountController.text);
     final typeStr = _type == TransactionType.income ? 'income' : _type == TransactionType.transfer ? 'transfer' : 'expense';
     await ref.read(transactionServiceProvider).addTransaction(

@@ -1,6 +1,6 @@
-# Fint
+# Sencillo
 
-App de finanzas personales para Android e iOS. Control total de tus ingresos, gastos, tarjetas de credito y objetivos de ahorro.
+App de finanzas personales para Android e iOS. Control total de tus ingresos, gastos, tarjetas de crédito y objetivos de ahorro.
 
 ## Funcionalidades principales
 

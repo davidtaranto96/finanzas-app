@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/feedback_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../transactions/presentation/widgets/add_transaction_bottom_sheet.dart';
 
-class AddTransactionFab extends StatefulWidget {
+class AddTransactionFab extends ConsumerStatefulWidget {
   const AddTransactionFab({super.key});
 
   @override
-  State<AddTransactionFab> createState() => _AddTransactionFabState();
+  ConsumerState<AddTransactionFab> createState() => _AddTransactionFabState();
 }
 
-class _AddTransactionFabState extends State<AddTransactionFab>
+class _AddTransactionFabState extends ConsumerState<AddTransactionFab>
     with SingleTickerProviderStateMixin {
   late final AnimationController _pulseCtrl;
   bool _longPressing = false;
@@ -33,7 +34,8 @@ class _AddTransactionFabState extends State<AddTransactionFab>
   void _onLongPressStart(LongPressStartDetails _) {
     setState(() => _longPressing = true);
     _pulseCtrl.repeat(reverse: true);
-    HapticFeedback.mediumImpact();
+    appHaptic(ref, type: HapticType.medium);
+    appSound(ref, type: SoundType.tap);
   }
 
   void _onLongPressEnd(LongPressEndDetails _) {

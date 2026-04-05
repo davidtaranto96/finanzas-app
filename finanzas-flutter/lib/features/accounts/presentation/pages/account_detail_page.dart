@@ -54,7 +54,7 @@ class AccountDetailPage extends ConsumerWidget {
                   SliverPadding(
                     padding: const EdgeInsets.all(20),
                     sliver: SliverToBoxAdapter(
-                      child: _AccountHeroCard(account: account),
+                      child: _AccountHeroCard(account: account, transactions: accountTxs),
                     ),
                   ),
 
@@ -153,10 +153,45 @@ class AccountDetailPage extends ConsumerWidget {
 
 class _AccountHeroCard extends ConsumerWidget {
   final dom.Account account;
-  const _AccountHeroCard({required this.account});
+  final List<dom_tx.Transaction> transactions;
+  const _AccountHeroCard({required this.account, required this.transactions});
+
+  /// Calculate expenses only within the current billing cycle
+  double _currentPeriodExpenses() {
+    if (!account.isCreditCard || account.closingDay == null) {
+      return account.balance.abs();
+    }
+    final now = DateTime.now();
+    final closingDay = account.closingDay!;
+
+    // Current period starts on the closing day of the previous month
+    DateTime periodStart;
+    if (now.day > closingDay) {
+      // We're past this month's closing → period started this month
+      periodStart = DateTime(now.year, now.month, closingDay + 1);
+    } else {
+      // We're before this month's closing → period started last month
+      final prevMonth = now.month == 1
+          ? DateTime(now.year - 1, 12, closingDay + 1)
+          : DateTime(now.year, now.month - 1, closingDay + 1);
+      periodStart = prevMonth;
+    }
+
+    double total = 0;
+    for (final tx in transactions) {
+      if (tx.date.isAfter(periodStart) || tx.date.isAtSameMomentAs(periodStart)) {
+        if (tx.type == dom_tx.TransactionType.expense) {
+          total += tx.amount;
+        }
+      }
+    }
+    return total;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final periodExpenses = account.isCreditCard ? _currentPeriodExpenses() : 0.0;
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -182,7 +217,9 @@ class _AccountHeroCard extends ConsumerWidget {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        '${account.currencyCode} ${formatAmount(account.balance)}',
+                        account.isCreditCard
+                            ? '${account.currencyCode} ${formatAmount(periodExpenses)}'
+                            : '${account.currencyCode} ${formatAmount(account.balance)}',
                         style: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white),
                       ),
                     ),
@@ -281,9 +318,9 @@ class _AccountHeroCard extends ConsumerWidget {
                     children: [
                       Text('Disponible', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
                       Text(
-                        formatAmount((account.creditLimit! - account.balance).clamp(0, account.creditLimit!)),
+                        formatAmount((account.creditLimit! - periodExpenses).clamp(0, account.creditLimit!)),
                         style: TextStyle(
-                          color: account.availableCredit > 0 ? AppTheme.colorIncome : AppTheme.colorExpense,
+                          color: (account.creditLimit! - periodExpenses) > 0 ? AppTheme.colorIncome : AppTheme.colorExpense,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -991,21 +1028,25 @@ class _TransactionDetailTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Cuotas pendientes
+// Cuotas pendientes (colapsable)
 // ─────────────────────────────────────────────────────────────────────────────
-class _InstallmentsCard extends StatelessWidget {
+class _InstallmentsCard extends StatefulWidget {
   final List<dom_tx.Transaction> transactions;
   const _InstallmentsCard({required this.transactions});
 
   @override
+  State<_InstallmentsCard> createState() => _InstallmentsCardState();
+}
+
+class _InstallmentsCardState extends State<_InstallmentsCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final pattern = RegExp(r'Cuota (\d+)/(\d+)');
-
-    // Group installment transactions by (title, total) to identify each purchase
-    // Key: "title|total"
     final Map<String, _InstallmentGroup> groups = {};
 
-    for (final tx in transactions) {
+    for (final tx in widget.transactions) {
       if (tx.note == null) continue;
       final match = pattern.firstMatch(tx.note!);
       if (match == null) continue;
@@ -1026,13 +1067,13 @@ class _InstallmentsCard extends StatelessWidget {
       }
     }
 
-    // Only show purchases with remaining installments
     final active = groups.values.where((g) => g.remaining > 0).toList()
       ..sort((a, b) => b.totalRemainingAmount.compareTo(a.totalRemainingAmount));
 
     if (active.isEmpty) return const SizedBox.shrink();
 
     final totalRemaining = active.fold(0.0, (sum, g) => sum + g.totalRemainingAmount);
+    final monthlyTotal = active.fold(0.0, (sum, g) => sum + g.monthlyAmount);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -1044,34 +1085,68 @@ class _InstallmentsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Row(
-              children: [
-                const Icon(Icons.credit_card_rounded, color: AppTheme.colorTransfer, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  'Cuotas pendientes',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white70,
+          // ── Header (siempre visible, tappable) ──
+          GestureDetector(
+            onTap: () => setState(() => _expanded = !_expanded),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+              child: Row(
+                children: [
+                  const Icon(Icons.credit_card_rounded, color: AppTheme.colorTransfer, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Cuotas pendientes',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white70,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${active.length} compras · ${formatAmount(monthlyTotal)}/mes',
+                          style: GoogleFonts.inter(fontSize: 11, color: Colors.white30),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const Spacer(),
-                Text(
-                  formatAmount(totalRemaining),
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.colorExpense,
+                  Text(
+                    formatAmount(totalRemaining),
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.colorExpense,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.expand_more_rounded, size: 20, color: Colors.white.withValues(alpha: 0.3)),
+                  ),
+                ],
+              ),
             ),
           ),
-          const Divider(color: Colors.white10, height: 1),
-          ...active.map((g) => _InstallmentRow(group: g)),
+
+          // ── Expandable detail ──
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity, height: 0),
+            secondChild: Column(
+              children: [
+                const Divider(color: Colors.white10, height: 1),
+                ...active.map((g) => _InstallmentRow(group: g)),
+              ],
+            ),
+            crossFadeState: _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 250),
+            sizeCurve: Curves.easeInOutCubicEmphasized,
+          ),
         ],
       ),
     );

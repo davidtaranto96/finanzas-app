@@ -36,7 +36,7 @@ class _LinkFriendPageState extends ConsumerState<LinkFriendPage> {
     // Formato esperado: "UID|APPCODE"
     final parts = raw.split('|');
     if (parts.length != 2) {
-      setState(() => _statusMessage = 'QR no reconocido. Pedile a tu amigo que use Finanzas.');
+      setState(() => _statusMessage = 'QR no reconocido. Pedile a tu amigo que use Sencillo.');
       return;
     }
 

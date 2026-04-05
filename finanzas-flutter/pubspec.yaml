@@ -1,7 +1,7 @@
-name: fint
-description: "Fint — tu app de finanzas personales: control total + decisiones conscientes + progreso visible"
+name: sencillo
+description: "Sencillo — tu app de finanzas personales: control total + decisiones conscientes + progreso visible"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.4.1+2
 
 environment:
   sdk: '>=3.1.0 <4.0.0'
@@ -56,6 +56,13 @@ dependencies:
   cloud_firestore: ^5.6.9
   firebase_storage: ^12.4.6
 
+  # Audio
+  audioplayers: ^6.1.0
+
+  # Notifications
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
+
   # QR
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.10
@@ -81,3 +88,6 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/
+    - assets/sounds/

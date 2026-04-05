@@ -20,8 +20,10 @@ import '../../features/accounts/presentation/pages/account_detail_page.dart';
 import '../../features/transactions/presentation/pages/transaction_detail_page.dart';
 import '../../features/goals/presentation/pages/savings_page.dart';
 import '../../features/more/presentation/pages/novedades_page.dart';
+import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../shell/app_shell.dart';
 import '../providers/auth_provider.dart';
+import '../providers/onboarding_provider.dart';
 
 /// Key del Navigator interno del ShellRoute — usado por AppShell para cerrar modales
 final shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -29,17 +31,21 @@ final shellNavigatorKey = GlobalKey<NavigatorState>();
 final appRouterProvider = Provider<GoRouter>((ref) {
   // Escucha el estado de auth para redirigir
   final authState = ref.watch(authStateProvider);
+  final skipAuth = ref.watch(skipAuthProvider);
 
   return GoRouter(
     initialLocation: '/home',
     redirect: (context, state) {
       final isLoggedIn = authState.valueOrNull != null;
       final isLoading = authState.isLoading;
+      final authSkipped = skipAuth.skipped;
       final goingToLogin = state.matchedLocation == '/login';
 
-      if (isLoading) return null; // esperá a que cargue
-      if (!isLoggedIn && !goingToLogin) return '/login';
-      if (isLoggedIn && goingToLogin) return '/home';
+      if (isLoading && !authSkipped) return null; // esperá a que cargue
+      // If user skipped auth OR is logged in, allow navigation
+      if ((isLoggedIn || authSkipped) && goingToLogin) return '/home';
+      // Not logged in and didn't skip → go to login
+      if (!isLoggedIn && !authSkipped && !goingToLogin) return '/login';
       return null;
     },
     routes: [
@@ -110,7 +116,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/accounts',
-        builder: (context, state) => const AccountsPage(),
+        builder: (context, state) => const AccountsPage(standalone: true),
       ),
       GoRoute(
         path: '/accounts/:accountId',
@@ -143,6 +149,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/novedades',
         builder: (context, state) => const NovedadesPage(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsPage(),
       ),
     ],
   );

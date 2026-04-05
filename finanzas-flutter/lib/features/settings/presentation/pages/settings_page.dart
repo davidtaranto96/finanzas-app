@@ -15,6 +15,9 @@ import '../../../../core/logic/user_profile_service.dart';
 import '../../../../core/providers/tab_config_provider.dart';
 import '../../../../core/providers/alerts_provider.dart';
 import '../../../../core/providers/onboarding_provider.dart';
+import '../../../../core/providers/feedback_provider.dart';
+import '../../../../core/providers/auth_provider.dart';
+import '../../../../core/services/notification_service.dart';
 import '../../../wishlist/presentation/providers/wishlist_provider.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -40,6 +43,10 @@ class SettingsPage extends ConsumerWidget {
         children: [
           // ── Profile Card ──
           _ProfileCard(),
+
+          // ── Connect Google (only if not logged in) ──
+          _ConnectGoogleCard(),
+
           const SizedBox(height: 24),
 
           // ── App Config ──
@@ -80,6 +87,55 @@ class SettingsPage extends ConsumerWidget {
                 );
               }
             },
+          ),
+
+          const SizedBox(height: 24),
+          _SectionTitle('Feedback'),
+          _SwitchTile(
+            icon: Icons.vibration_rounded,
+            title: 'Respuesta háptica',
+            subtitle: 'Vibración al tocar botones',
+            color: const Color(0xFF6C63FF),
+            provider: hapticEnabledProvider,
+          ),
+          _SwitchTile(
+            icon: Icons.volume_up_rounded,
+            title: 'Sonidos',
+            subtitle: 'Efectos de sonido minimalistas',
+            color: AppTheme.colorTransfer,
+            provider: soundEnabledProvider,
+          ),
+
+          const SizedBox(height: 24),
+          _SectionTitle('Notificaciones'),
+          _SwitchTile(
+            icon: Icons.credit_card_rounded,
+            title: 'Vencimientos de tarjetas',
+            subtitle: 'Alerta antes del cierre de tarjeta',
+            color: AppTheme.colorExpense,
+            provider: notifCardDueEnabledProvider,
+          ),
+          _SwitchTile(
+            icon: Icons.people_rounded,
+            title: 'Recordatorio de deudas',
+            subtitle: 'Aviso periódico de deudas pendientes',
+            color: AppTheme.colorTransfer,
+            provider: notifDebtRemindEnabledProvider,
+          ),
+          _NotifDaysSelector(
+            icon: Icons.calendar_today_rounded,
+            title: 'Días antes del cierre',
+            color: AppTheme.colorExpense,
+            provider: notifCardDueDaysBeforeProvider,
+            options: const [1, 2, 3, 5, 7],
+          ),
+          _NotifDaysSelector(
+            icon: Icons.timer_rounded,
+            title: 'Recordar deudas cada',
+            color: AppTheme.colorTransfer,
+            provider: notifDebtRemindDaysProvider,
+            options: const [3, 5, 7, 14, 30],
+            suffix: ' días',
           ),
 
           const SizedBox(height: 24),
@@ -284,18 +340,124 @@ class SettingsPage extends ConsumerWidget {
     await db.delete(db.wishlistTable).go();
     await db.delete(db.userProfileTable).go();
     await ref.read(dismissedAlertsProvider.notifier).clearAll();
+
+    // Sign out of Firebase if logged in
+    try {
+      final authState = ref.read(authStateProvider);
+      if (authState.valueOrNull != null) {
+        await ref.read(firebaseAuthServiceProvider).signOut();
+      }
+    } catch (_) {}
+
+    // Reset skip-auth flag so router redirects to login
+    await ref.read(skipAuthProvider).reset();
+
+    // Reset onboarding so user can re-view it if desired
     await ref.read(onboardingProvider).reset();
-    await db.ensureDefaultCashAccount();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Datos eliminados. Configurá tu primera cuenta para empezar.'),
-          duration: Duration(seconds: 4),
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// Connect Google Card — shown only when not logged in
+// ─────────────────────────────────────────────────────
+class _ConnectGoogleCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+    final isLoggedIn = authState.valueOrNull != null;
+
+    // Don't show if already logged in
+    if (isLoggedIn) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: GestureDetector(
+        onTap: () async {
+          try {
+            final service = ref.read(firebaseAuthServiceProvider);
+            final user = await service.signInWithGoogle();
+            if (user != null) {
+              // Clear skip-auth flag since they're now logged in
+              await ref.read(skipAuthProvider).reset();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Cuenta conectada: ${user.email}',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+                  ),
+                  backgroundColor: const Color(0xFF5ECFB1),
+                ),
+              );
+            }
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error al conectar: $e'),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            }
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFF40C4FF).withValues(alpha: 0.12),
+                const Color(0xFF40C4FF).withValues(alpha: 0.04),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: const Color(0xFF40C4FF).withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF40C4FF).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.cloud_outlined,
+                    color: Color(0xFF40C4FF), size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Conectar cuenta Google',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Activá backup y sincronización',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded,
+                  size: 14, color: Colors.white.withValues(alpha: 0.3)),
+            ],
+          ),
         ),
-      );
-      context.go('/accounts');
-    }
+      ),
+    );
   }
 }
 
@@ -1234,6 +1396,141 @@ class _DangerTile extends StatelessWidget {
       subtitle: Text(subtitle,
           style:
               const TextStyle(color: Colors.white38, fontSize: 12)),
+    );
+  }
+}
+
+class _SwitchTile extends ConsumerWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final StateNotifierProvider<BoolPrefNotifier, bool> provider;
+
+  const _SwitchTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.provider,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(provider);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E2C).withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: ListTile(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        title: Text(title,
+            style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+                fontSize: 14)),
+        subtitle: Text(subtitle,
+            style: const TextStyle(
+                fontSize: 12, color: Colors.white54)),
+        trailing: Switch.adaptive(
+          value: enabled,
+          onChanged: (_) => ref.read(provider.notifier).toggle(),
+          activeThumbColor: color,
+          activeTrackColor: color.withValues(alpha: 0.3),
+          inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
+          inactiveThumbColor: Colors.white38,
+        ),
+      ),
+    );
+  }
+}
+
+/// Selector for notification timing (days)
+class _NotifDaysSelector extends ConsumerWidget {
+  final IconData icon;
+  final String title;
+  final Color color;
+  final StateNotifierProvider<IntPrefNotifier, int> provider;
+  final List<int> options;
+  final String suffix;
+
+  const _NotifDaysSelector({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.provider,
+    required this.options,
+    this.suffix = '',
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(provider);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E2C).withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: ListTile(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        title: Text(title,
+            style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+                fontSize: 14)),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButton<int>(
+            value: options.contains(current) ? current : options.first,
+            dropdownColor: const Color(0xFF2A2A3C),
+            underline: const SizedBox.shrink(),
+            icon: Icon(Icons.expand_more_rounded, color: color, size: 18),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+            items: options
+                .map((v) => DropdownMenuItem(
+                      value: v,
+                      child: Text('$v${suffix.isEmpty ? " días" : suffix}'),
+                    ))
+                .toList(),
+            onChanged: (v) {
+              if (v != null) ref.read(provider.notifier).set(v);
+            },
+          ),
+        ),
+      ),
     );
   }
 }

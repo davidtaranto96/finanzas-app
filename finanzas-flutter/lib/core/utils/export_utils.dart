@@ -51,7 +51,7 @@ Future<String> generateMonthlyReportPdf({
   y += 70;
 
   graphics.drawString(
-    'Generado por Fint · ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
+    'Generado por Sencillo · ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
     smallFont,
     bounds: Rect.fromLTWH(0, y, pageWidth, 14),
     brush: PdfSolidBrush(PdfColor(140, 140, 160)),
@@ -162,7 +162,7 @@ Future<String> generateMonthlyReportPdf({
 
   // ─── Footer ───
   graphics.drawString(
-    'Fint — Tu finanzas personales',
+    'Sencillo — Tus finanzas personales',
     smallFont,
     bounds: Rect.fromLTWH(0, page.getClientSize().height - 20, pageWidth, 14),
     brush: PdfSolidBrush(PdfColor(160, 160, 180)),
@@ -183,7 +183,7 @@ Future<String> generateMonthlyReportPdf({
     }
   }
   dir ??= await getApplicationDocumentsDirectory();
-  final fileName = 'Fint_Resumen_${capitalizedMonth.replaceAll(' ', '_')}.pdf';
+  final fileName = 'Sencillo_Resumen_${capitalizedMonth.replaceAll(' ', '_')}.pdf';
   final file = File('${dir.path}/$fileName');
   await file.writeAsBytes(bytes);
 

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'app/app.dart';
+import 'core/services/notification_service.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -12,6 +13,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize notifications
+  await NotificationService.initialize();
+  await NotificationService.requestPermission();
 
   // Nota: sqlite3_flutter_libs se carga automáticamente al importar.
   // En versiones 0.6.0+, applyWorkaroundToOpenSqliteOnOldAndroidVersions() fue removido.
@@ -32,7 +37,7 @@ void main() async {
 
   runApp(
     const ProviderScope(
-      child: FinanzasApp(),
+      child: SencilloApp(),
     ),
   );
 }

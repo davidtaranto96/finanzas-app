@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/providers/shell_providers.dart';
+import '../../../../core/providers/feedback_provider.dart';
 import '../../../../core/database/database_providers.dart';
 import '../../../../core/logic/account_service.dart';
 import '../../../../core/utils/format_utils.dart';
@@ -53,7 +55,8 @@ Color getAccountColor(dom.Account acc) {
 }
 
 class AccountsPage extends ConsumerWidget {
-  const AccountsPage({super.key});
+  final bool standalone;
+  const AccountsPage({super.key, this.standalone = false});
 
   /// Sort accounts by custom order (saved in SharedPreferences), fallback to default sort
   List<dom.Account> _sortAccounts(List<dom.Account> accounts, List<String> customOrder) {
@@ -86,6 +89,15 @@ class AccountsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Listen for shell FAB trigger to open add-account dialog
+    if (!standalone) {
+      ref.listen<int>(addAccountRequestProvider, (prev, next) {
+        if (prev != null && next > prev) {
+          _showAddAccountDialog(context, ref);
+        }
+      });
+    }
+
     final accountsAsync = ref.watch(accountsStreamProvider);
     final customOrder = ref.watch(accountOrderProvider);
     final txsAsync = ref.watch(transactionsStreamProvider);
@@ -102,12 +114,39 @@ class AccountsPage extends ConsumerWidget {
         final now = DateTime.now();
         final txs = txsAsync.valueOrNull ?? [];
         final Map<String, double> monthSpendByAccount = {};
+        // Period spending for credit cards (based on closing day)
+        final Map<String, double> periodSpendByAccount = {};
+
         for (final t in txs) {
-          if (t.type == dom_tx.TransactionType.expense &&
-              t.date.month == now.month &&
-              t.date.year == now.year) {
-            monthSpendByAccount[t.accountId] =
-                (monthSpendByAccount[t.accountId] ?? 0) + t.amount;
+          if (t.type == dom_tx.TransactionType.expense) {
+            if (t.date.month == now.month && t.date.year == now.year) {
+              monthSpendByAccount[t.accountId] =
+                  (monthSpendByAccount[t.accountId] ?? 0) + t.amount;
+            }
+          }
+        }
+
+        // Calculate billing period expenses for each credit card
+        for (final acc in sorted) {
+          if (acc.isCreditCard && acc.closingDay != null) {
+            final closingDay = acc.closingDay!;
+            DateTime periodStart;
+            if (now.day > closingDay) {
+              periodStart = DateTime(now.year, now.month, closingDay + 1);
+            } else {
+              periodStart = now.month == 1
+                  ? DateTime(now.year - 1, 12, closingDay + 1)
+                  : DateTime(now.year, now.month - 1, closingDay + 1);
+            }
+            double total = 0;
+            for (final t in txs) {
+              if (t.accountId == acc.id &&
+                  t.type == dom_tx.TransactionType.expense &&
+                  (t.date.isAfter(periodStart) || t.date.isAtSameMomentAs(periodStart))) {
+                total += t.amount;
+              }
+            }
+            periodSpendByAccount[acc.id] = total;
           }
         }
         return Scaffold(
@@ -138,6 +177,7 @@ class AccountsPage extends ConsumerWidget {
                   return _AccountCard(
                     account: acc,
                     monthSpend: monthSpendByAccount[acc.id] ?? 0.0,
+                    periodSpend: periodSpendByAccount[acc.id],
                     onTap: () => context.push('/accounts/${acc.id}'),
                     onLongPress: () =>
                         _showAccountOptions(context, ref, acc),
@@ -149,17 +189,19 @@ class AccountsPage extends ConsumerWidget {
                   );
                 },
               ),
-              Positioned(
-                right: 16,
-                bottom: MediaQuery.of(context).padding.bottom + 16,
-                child: AppFab(
-                  icon: Icons.add_rounded,
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-                    _showAddAccountDialog(context, ref);
-                  },
+              if (standalone)
+                Positioned(
+                  right: 16,
+                  bottom: MediaQuery.of(context).padding.bottom + 16,
+                  child: AppFab(
+                    icon: Icons.add_rounded,
+                    onPressed: () {
+                      appHaptic(ref, type: HapticType.medium);
+                      appSound(ref, type: SoundType.tap);
+                      _showAddAccountDialog(context, ref);
+                    },
+                  ),
                 ),
-              ),
             ],
           ),
         );
@@ -1203,6 +1245,7 @@ class AccountsPage extends ConsumerWidget {
 class _AccountCard extends StatelessWidget {
   final dom.Account account;
   final double monthSpend;
+  final double? periodSpend; // Billing-cycle spend for credit cards
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback? onPayStatement;
@@ -1210,6 +1253,7 @@ class _AccountCard extends StatelessWidget {
   const _AccountCard({
     required this.account,
     required this.monthSpend,
+    this.periodSpend,
     required this.onTap,
     required this.onLongPress,
     this.onPayStatement,
@@ -1288,7 +1332,9 @@ class _AccountCard extends StatelessWidget {
                         ],
                       ),
                       Text(
-                        formatAmount(acc.balance),
+                        acc.isCreditCard
+                            ? formatAmount(periodSpend ?? monthSpend)
+                            : formatAmount(acc.balance),
                         style: GoogleFonts.inter(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -1302,16 +1348,16 @@ class _AccountCard extends StatelessWidget {
                               color: AppTheme.colorExpense,
                               fontSize: 10),
                         ),
-                      if (acc.isCreditCard && monthSpend > 0)
+                      if (acc.isCreditCard && monthSpend > 0 && periodSpend != null && monthSpend != periodSpend)
                         Text(
-                          'Este mes: ${formatAmount(monthSpend)}',
+                          'Mes calendario: ${formatAmount(monthSpend)}',
                           style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.5),
                               fontSize: 10),
                         ),
                       if (acc.isCreditCard && acc.creditLimit != null && acc.creditLimit! > 0)
                         Text(
-                          'Disponible: ${formatAmount(acc.creditLimit! - monthSpend)}',
+                          'Disponible: ${formatAmount(acc.creditLimit! - (periodSpend ?? monthSpend))}',
                           style: TextStyle(
                               color: accColor.withValues(alpha: 0.7),
                               fontSize: 10),

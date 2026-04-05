@@ -167,6 +167,28 @@ class FirestoreService {
     });
   }
 
+  /// Notifica al amigo que se liquidó una deuda.
+  Future<void> createDebtSettlement({
+    required String friendUid,
+    required double amount,
+    required String description,
+  }) async {
+    if (uid == null) return;
+    await _db.collection('sharedExpenses').add({
+      'createdByUid': uid,
+      'title': description,
+      'totalAmount': amount.abs(),
+      'date': Timestamp.fromDate(DateTime.now()),
+      'category': 'settlement',
+      'status': 'active',
+      'splits': {
+        uid!: {'amount': 0, 'accepted': true, 'localTxId': null},
+        friendUid: {'amount': amount.abs(), 'accepted': false, 'localTxId': null, 'isSettlement': true},
+      },
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   /// Rechaza / ignora un gasto compartido (marca como ignorado para mí).
   Future<void> declineSharedExpense(String expenseId) async {
     if (uid == null) return;

@@ -49,6 +49,9 @@ const _cacheTtlMinutes = 5;
 /// Counter que se incrementa al hacer refresh manual para invalidar el provider
 final _currencyRefreshCounter = StateProvider<int>((ref) => 0);
 
+/// Timestamp del último refresh manual (sobrevive rebuilds del widget)
+final lastManualRefreshProvider = StateProvider<DateTime?>((ref) => null);
+
 /// FutureProvider con caché de 5 minutos en SharedPreferences.
 /// Fuente: dolarapi.com (sin auth, gratuita)
 final currencyRatesProvider = FutureProvider.autoDispose<List<CurrencyRate>>((ref) {
@@ -61,6 +64,7 @@ final currencyRatesProvider = FutureProvider.autoDispose<List<CurrencyRate>>((re
 void refreshCurrencyRates(WidgetRef ref) {
   _clearCache();
   ref.read(_currencyRefreshCounter.notifier).state++;
+  ref.read(lastManualRefreshProvider.notifier).state = DateTime.now();
 }
 
 /// Forzar refresh manual desde un Ref genérico (para auto-refresh timer)

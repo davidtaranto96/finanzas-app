@@ -422,6 +422,9 @@ class PeopleService {
     required double newOwn,
     required double newOther,
     String? description,
+    String? accountId,
+    String? categoryId,
+    DateTime? date,
   }) async {
     await db.transaction(() async {
       final tx = await (db.select(db.transactionsTable)
@@ -459,6 +462,9 @@ class PeopleService {
         sharedTotalAmount: drift.Value(newTotal),
         sharedOwnAmount: drift.Value(newOwn),
         sharedOtherAmount: drift.Value(newOther),
+        accountId: accountId != null ? drift.Value(accountId) : const drift.Value.absent(),
+        categoryId: categoryId != null ? drift.Value(categoryId) : const drift.Value.absent(),
+        date: date != null ? drift.Value(date) : const drift.Value.absent(),
       ));
     });
   }

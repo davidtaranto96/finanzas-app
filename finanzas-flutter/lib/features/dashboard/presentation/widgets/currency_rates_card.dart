@@ -48,7 +48,6 @@ class _RatesCardState extends ConsumerState<_RatesCard> {
   bool _showBuy = false;
   bool _showConverter = false;
   bool _refreshing = false;
-  DateTime? _lastManualRefresh;
   final _arsCtrl = TextEditingController();
   final _usdCtrl = TextEditingController();
   bool _editingArs = true; // which field is the source
@@ -140,10 +139,7 @@ class _RatesCardState extends ConsumerState<_RatesCard> {
                     // Esperar un poco para que el provider re-fetch
                     await Future.delayed(const Duration(milliseconds: 1200));
                     if (mounted) {
-                      setState(() {
-                        _refreshing = false;
-                        _lastManualRefresh = DateTime.now();
-                      });
+                      setState(() => _refreshing = false);
                     }
                   },
                   child: Container(
@@ -259,34 +255,36 @@ class _RatesCardState extends ConsumerState<_RatesCard> {
           ),
 
           // ── Footer: última actualización ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-            child: Row(
-              children: [
-                Icon(
-                  _lastManualRefresh != null && DateTime.now().difference(_lastManualRefresh!).inMinutes < 2
-                      ? Icons.check_circle_rounded
-                      : Icons.schedule_rounded,
-                  size: 10,
-                  color: _lastManualRefresh != null && DateTime.now().difference(_lastManualRefresh!).inMinutes < 2
-                      ? AppTheme.colorIncome.withValues(alpha: 0.5)
-                      : Colors.white24,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    _getUpdateLabel(updated),
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      color: _lastManualRefresh != null && DateTime.now().difference(_lastManualRefresh!).inMinutes < 2
-                          ? AppTheme.colorIncome.withValues(alpha: 0.6)
-                          : Colors.white24,
+          Builder(builder: (context) {
+            final lastRefresh = ref.watch(lastManualRefreshProvider);
+            final isRecent = lastRefresh != null && DateTime.now().difference(lastRefresh).inMinutes < 2;
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+              child: Row(
+                children: [
+                  Icon(
+                    isRecent ? Icons.check_circle_rounded : Icons.schedule_rounded,
+                    size: 10,
+                    color: isRecent
+                        ? AppTheme.colorIncome.withValues(alpha: 0.5)
+                        : Colors.white24,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      _getUpdateLabel(updated, lastRefresh),
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: isRecent
+                            ? AppTheme.colorIncome.withValues(alpha: 0.6)
+                            : Colors.white24,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -301,9 +299,9 @@ class _RatesCardState extends ConsumerState<_RatesCard> {
     return 'hace ${diff.inDays}d';
   }
 
-  String _getUpdateLabel(String apiTime) {
-    if (_lastManualRefresh != null) {
-      final diff = DateTime.now().difference(_lastManualRefresh!);
+  String _getUpdateLabel(String apiTime, DateTime? lastRefresh) {
+    if (lastRefresh != null) {
+      final diff = DateTime.now().difference(lastRefresh);
       if (diff.inSeconds < 30) return 'Actualizado recién · dolarapi.com';
       if (diff.inMinutes < 2) return 'Actualizado recientemente · dolarapi.com';
       if (diff.inMinutes < 60) return 'Actualizado hace ${diff.inMinutes} min · dolarapi.com';

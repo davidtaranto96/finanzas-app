@@ -732,20 +732,20 @@ showModalBottomSheet(
                               newOwn: newOwn,
                               newOther: newOther > 0 ? newOther : 0,
                               description: titleCtrl.text.isNotEmpty ? titleCtrl.text : null,
+                              accountId: selectedAccountId,
+                              categoryId: selectedCategory,
+                              date: selectedDate,
                             );
                           } else {
                             final origType = tx.type == TransactionType.income ? 'income' : tx.type == TransactionType.transfer ? 'transfer' : 'expense';
-                            // Always pass accountId if it changed — use explicit variable
-                            final newAccountId = selectedAccountId;
-                            final accountChanged = newAccountId != tx.accountId;
                             await ref.read(transactionServiceProvider).updateTransaction(
                               id: tx.id,
                               title: titleCtrl.text,
-                              amount: newAmount != tx.amount ? newAmount : null,
+                              amount: newAmount,
                               type: selectedType != origType ? selectedType : null,
-                              categoryId: selectedCategory != tx.categoryId ? selectedCategory : null,
-                              accountId: accountChanged ? newAccountId : null,
-                              date: selectedDate != tx.date ? selectedDate : null,
+                              categoryId: selectedCategory,
+                              accountId: selectedAccountId,
+                              date: selectedDate,
                               note: noteCtrl.text.isNotEmpty ? noteCtrl.text : null,
                               clearNote: noteCtrl.text.isEmpty && tx.note != null,
                             );

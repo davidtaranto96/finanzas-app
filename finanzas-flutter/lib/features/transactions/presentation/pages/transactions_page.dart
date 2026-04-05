@@ -1181,11 +1181,11 @@ class _TxCard extends ConsumerWidget {
                                 await ref.read(transactionServiceProvider).updateTransaction(
                                   id: tx.id,
                                   title: titleCtrl.text,
-                                  amount: newAmount != tx.amount ? newAmount : null,
+                                  amount: newAmount,
                                   type: selectedType != origType ? selectedType : null,
-                                  categoryId: selectedCategory != tx.categoryId ? selectedCategory : null,
-                                  accountId: selectedAccountId != tx.accountId ? selectedAccountId : null,
-                                  date: selectedDate != tx.date ? selectedDate : null,
+                                  categoryId: selectedCategory,
+                                  accountId: selectedAccountId,
+                                  date: selectedDate,
                                   note: noteCtrl.text.isNotEmpty ? noteCtrl.text : null,
                                   clearNote: noteCtrl.text.isEmpty && tx.note != null,
                                 );

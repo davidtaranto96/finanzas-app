@@ -13,7 +13,6 @@ class CloudBackupService {
   Reference get _backupRef => _storage.ref('users/$uid/finanzas_app.sqlite');
 
   /// Sube el archivo SQLite local a Firebase Storage.
-  /// Devuelve la fecha del backup realizado.
   Future<DateTime> uploadBackup() async {
     final dbFile = await _dbFile();
     if (!await dbFile.exists()) {
@@ -43,7 +42,6 @@ class CloudBackupService {
     await _backupRef.writeToFile(tempFile);
 
     if (await tempFile.exists()) {
-      // Reemplazar la DB local
       if (await dbFile.exists()) await dbFile.delete();
       await tempFile.rename(dbFile.path);
 
@@ -54,7 +52,21 @@ class CloudBackupService {
     }
   }
 
-  /// Devuelve la fecha del último backup, o null si nunca se hizo uno.
+  /// Check if a remote backup exists in Firebase Storage.
+  /// Returns the creation date if found, null if not.
+  Future<DateTime?> remoteBackupDate() async {
+    try {
+      final metadata = await _backupRef.getMetadata();
+      final createdAt = metadata.customMetadata?['createdAt'];
+      if (createdAt != null) return DateTime.tryParse(createdAt);
+      return metadata.updated ?? metadata.timeCreated;
+    } catch (_) {
+      // File doesn't exist or no permission
+      return null;
+    }
+  }
+
+  /// Devuelve la fecha del último backup local, o null.
   Future<DateTime?> lastBackupDate() async {
     final prefs = await SharedPreferences.getInstance();
     final ts = prefs.getString('last_backup_ts');

@@ -11,3 +11,7 @@ final txFilterProvider = StateProvider<TxFilterType>((ref) => TxFilterType.all);
 /// Request navigation to a specific tab by ID (e.g. 'transactions')
 /// Shell watches this and jumps the PageView accordingly, then resets to null.
 final navigateToTabProvider = StateProvider<String?>((ref) => null);
+
+/// Shell FAB triggers add-account dialog by incrementing this counter.
+/// AccountsPage listens and opens the dialog.
+final addAccountRequestProvider = StateProvider<int>((ref) => 0);

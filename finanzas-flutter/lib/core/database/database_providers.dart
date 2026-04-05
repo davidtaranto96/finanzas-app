@@ -17,58 +17,81 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   return db;
 });
 
-// Accounts Stream with real-time balance calculation
+// Accounts Stream with real-time balance calculation.
+// Uses a StreamController that listens to BOTH accounts and transactions tables
+// so balance recalculates whenever either table changes (account edit, tx add/edit/delete).
 final accountsStreamProvider = StreamProvider<List<dom.Account>>((ref) {
   final db = ref.watch(databaseProvider);
-  
-  // Combine account stream with transaction stream for real-time balance calculation
-  return db.select(db.accountsTable).watch().asyncMap((entities) async {
-    final List<dom.Account> accounts = [];
-    
-    for (final e in entities) {
-      // Get all transactions for this account
-      final txs = await (db.select(db.transactionsTable)
-        ..where((t) => t.accountId.equals(e.id))).get();
-      
-      double currentBalance = e.initialBalance;
-      for (final tx in txs) {
-        // Skip retroactive transactions — they are for historical monthly
-        // overview only and must NOT affect the current real balance.
-        if (tx.note != null && tx.note!.contains('[retroactivo]')) continue;
 
-        if (tx.type == dom_tx.TransactionType.income.name) {
-          currentBalance += tx.amount;
-        } else if (tx.type == dom_tx.TransactionType.expense.name) {
-          currentBalance -= tx.amount;
-        }
-        // Transfers are tricky, but in this app they usually target a specific account
-        // If type is transfer and account matches, it was a debit.
-        // In this schema, transfers usually have source/target in a different way or are just expenses.
-        if (tx.type == 'transfer') {
-          currentBalance -= tx.amount;
-        }
+  final controller = StreamController<List<dom.Account>>();
+  bool disposed = false;
+
+  Future<void> recalculate() async {
+    if (disposed) return;
+    try {
+      final entities = await db.select(db.accountsTable).get();
+      final allTxs = await db.select(db.transactionsTable).get();
+
+      // Group transactions by accountId for efficient lookup
+      final txsByAccount = <String, List<TransactionEntity>>{};
+      for (final tx in allTxs) {
+        txsByAccount.putIfAbsent(tx.accountId, () => []).add(tx);
       }
 
-      accounts.add(dom.Account(
-        id: e.id,
-        name: e.name,
-        type: _parseAccountType(e.type),
-        balance: currentBalance,
-        currencyCode: e.currencyCode,
-        icon: e.iconName,
-        color: e.colorValue != null ? '#${e.colorValue!.toRadixString(16)}' : null,
-        isDefault: e.isDefault,
-        closingDay: e.closingDay,
-        dueDay: e.dueDay,
-        creditLimit: e.creditLimit,
-        pendingStatementAmount: e.pendingStatementAmount,
-        lastClosedDate: e.lastClosedDate,
-        alias: e.alias,
-        cvu: e.cvu,
-      ));
+      final List<dom.Account> accounts = [];
+      for (final e in entities) {
+        final txs = txsByAccount[e.id] ?? [];
+
+        double currentBalance = e.initialBalance;
+        for (final tx in txs) {
+          if (tx.note != null && tx.note!.contains('[retroactivo]')) continue;
+
+          if (tx.type == dom_tx.TransactionType.income.name) {
+            currentBalance += tx.amount;
+          } else if (tx.type == dom_tx.TransactionType.expense.name) {
+            currentBalance -= tx.amount;
+          }
+          if (tx.type == 'transfer') {
+            currentBalance -= tx.amount;
+          }
+        }
+
+        accounts.add(dom.Account(
+          id: e.id,
+          name: e.name,
+          type: _parseAccountType(e.type),
+          balance: currentBalance,
+          currencyCode: e.currencyCode,
+          icon: e.iconName,
+          color: e.colorValue != null ? '#${e.colorValue!.toRadixString(16)}' : null,
+          isDefault: e.isDefault,
+          closingDay: e.closingDay,
+          dueDay: e.dueDay,
+          creditLimit: e.creditLimit,
+          pendingStatementAmount: e.pendingStatementAmount,
+          lastClosedDate: e.lastClosedDate,
+          alias: e.alias,
+          cvu: e.cvu,
+        ));
+      }
+      if (!disposed) controller.add(accounts);
+    } catch (e) {
+      if (!disposed) controller.addError(e);
     }
-    return accounts;
+  }
+
+  // Listen to both tables independently — recalculate when either changes
+  final sub1 = db.select(db.accountsTable).watch().listen((_) => recalculate());
+  final sub2 = db.select(db.transactionsTable).watch().listen((_) => recalculate());
+
+  ref.onDispose(() {
+    disposed = true;
+    sub1.cancel();
+    sub2.cancel();
+    controller.close();
   });
+
+  return controller.stream;
 });
 
 // Transactions Stream

@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/database/database_providers.dart';
 import '../../core/providers/shell_providers.dart';
 import '../../core/providers/tab_config_provider.dart';
+import '../../core/providers/feedback_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../features/dashboard/presentation/pages/home_page.dart';
 import '../../features/transactions/presentation/pages/transactions_page.dart';
@@ -24,6 +24,7 @@ import '../../features/wishlist/presentation/widgets/add_wishlist_bottom_sheet.d
 import '../../features/reports/presentation/pages/reports_page.dart';
 import '../../features/accounts/presentation/pages/accounts_page.dart';
 import '../../features/goals/presentation/pages/savings_page.dart';
+import '../services/notification_service.dart';
 import '../widgets/app_fab.dart';
 
 class AppShell extends ConsumerStatefulWidget {
@@ -61,6 +62,57 @@ class _AppShellState extends ConsumerState<AppShell> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
+    // Schedule notifications on app start + check for in-app alerts
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(notificationServiceProvider).refreshAll(ref);
+      _checkInAppAlerts();
+    });
+  }
+
+  /// Check for upcoming card due dates and pending debts, add in-app notifications
+  Future<void> _checkInAppAlerts() async {
+    final db = ref.read(databaseProvider);
+    final notifCenter = ref.read(notificationCenterProvider.notifier);
+    final now = DateTime.now();
+
+    // Check credit card closing dates
+    final accounts = await db.select(db.accountsTable).get();
+    for (final acc in accounts) {
+      if (acc.type == 'credit' && acc.closingDay != null) {
+        final closingDay = acc.closingDay!;
+        final daysUntil = closingDay >= now.day
+            ? closingDay - now.day
+            : (DateTime(now.year, now.month + 1, 0).day - now.day) + closingDay;
+
+        if (daysUntil <= 5 && daysUntil > 0) {
+          notifCenter.add(AppNotification(
+            id: 'card_due_${acc.id}_${now.month}',
+            title: '💳 ${acc.name}',
+            body: 'Cierra en $daysUntil día${daysUntil == 1 ? "" : "s"} (día $closingDay)',
+            type: 'card_due',
+            createdAt: now,
+            relatedId: acc.id,
+          ));
+        }
+      }
+    }
+
+    // Check pending debts with people
+    final persons = await db.select(db.personsTable).get();
+    for (final p in persons) {
+      if (p.totalBalance.abs() > 100) {
+        final owesMe = p.totalBalance > 0;
+        final amount = p.totalBalance.abs().toStringAsFixed(0);
+        notifCenter.add(AppNotification(
+          id: 'debt_${p.id}_${now.day}',
+          title: owesMe ? '🔔 ${p.name} te debe' : '🔔 Le debés a ${p.name}',
+          body: '\$$amount pendiente',
+          type: 'debt_remind',
+          createdAt: now,
+          relatedId: p.id,
+        ));
+      }
+    }
   }
 
   @override
@@ -113,7 +165,8 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   void _onTap(int pageIndex) {
-    HapticFeedback.selectionClick();
+    appHaptic(ref, type: HapticType.selection);
+    appSound(ref, type: SoundType.nav);
     _pageController.animateToPage(
       pageIndex,
       duration: const Duration(milliseconds: 400),
@@ -196,7 +249,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         if (!txSearchActive) {
           fabIcon = Icons.search_rounded;
           fabAction = () {
-            HapticFeedback.lightImpact();
+            appHaptic(ref, type: HapticType.light);
+            appSound(ref, type: SoundType.tap);
             ref.read(txSearchActiveProvider.notifier).state = true;
           };
         }
@@ -204,7 +258,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         if (budgets.isNotEmpty) {
           fabIcon = Icons.add_rounded;
           fabAction = () {
-            HapticFeedback.lightImpact();
+            appHaptic(ref, type: HapticType.medium);
+            appSound(ref, type: SoundType.tap);
             AddBudgetBottomSheet.show(context);
           };
         }
@@ -212,27 +267,31 @@ class _AppShellState extends ConsumerState<AppShell> {
         if (goals.isNotEmpty) {
           fabIcon = Icons.add_rounded;
           fabAction = () {
-            HapticFeedback.lightImpact();
+            appHaptic(ref, type: HapticType.medium);
+            appSound(ref, type: SoundType.tap);
             AddGoalBottomSheet.show(context);
           };
         }
       case 'people':
         fabIcon = Icons.add_rounded;
         fabAction = () {
-          HapticFeedback.mediumImpact();
+          appHaptic(ref, type: HapticType.medium);
+          appSound(ref, type: SoundType.tap);
           showPeopleFabMenu(context, ref);
         };
       case 'wishlist':
         fabIcon = Icons.add_shopping_cart_rounded;
         fabAction = () {
-          HapticFeedback.lightImpact();
+          appHaptic(ref, type: HapticType.medium);
+          appSound(ref, type: SoundType.tap);
           AddWishlistBottomSheet.show(context);
         };
       case 'accounts':
         fabIcon = Icons.add_rounded;
         fabAction = () {
-          HapticFeedback.lightImpact();
-          context.push('/accounts');
+          appHaptic(ref, type: HapticType.medium);
+          appSound(ref, type: SoundType.tap);
+          ref.read(addAccountRequestProvider.notifier).state++;
         };
       case 'monthly_overview':
       case 'reports':
@@ -263,25 +322,15 @@ class _AppShellState extends ConsumerState<AppShell> {
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeInOut,
               child: AnimatedScale(
-                scale: fabAction != null ? 1.0 : 0.0,
+                scale: fabAction != null ? 1.0 : 0.6,
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOutCubicEmphasized,
                 child: IgnorePointer(
                   ignoring: fabAction == null,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    switchInCurve: Curves.easeOut,
-                    switchOutCurve: Curves.easeIn,
-                    transitionBuilder: (child, anim) => ScaleTransition(
-                      scale: anim,
-                      child: child,
-                    ),
-                    child: AppFab(
-                      key: ValueKey(fabIcon),
-                      icon: fabIcon ?? Icons.add_rounded,
-                      onPressed: fabAction ?? () {},
-                      onLongPress: fabLongPress,
-                    ),
+                  child: AppFab(
+                    icon: fabIcon ?? Icons.add_rounded,
+                    onPressed: fabAction ?? () {},
+                    onLongPress: fabLongPress,
                   ),
                 ),
               ),

@@ -1,11 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/feedback_provider.dart';
 import '../theme/app_theme.dart';
 
 /// Reusable morphing FAB — same visual style as the shell's FAB.
 /// Used both in AppShell (for nav tabs) and standalone pages (e.g., Accounts).
-class AppFab extends StatefulWidget {
+class AppFab extends ConsumerStatefulWidget {
   final IconData icon;
   final VoidCallback onPressed;
   final VoidCallback? onLongPress;
@@ -18,10 +19,10 @@ class AppFab extends StatefulWidget {
   });
 
   @override
-  State<AppFab> createState() => _AppFabState();
+  ConsumerState<AppFab> createState() => _AppFabState();
 }
 
-class _AppFabState extends State<AppFab> with SingleTickerProviderStateMixin {
+class _AppFabState extends ConsumerState<AppFab> with SingleTickerProviderStateMixin {
   late AnimationController _pulseCtrl;
   bool _longPressing = false;
 
@@ -53,7 +54,8 @@ class _AppFabState extends State<AppFab> with SingleTickerProviderStateMixin {
   void _onLongPressStart(LongPressStartDetails _) {
     setState(() => _longPressing = true);
     _pulseCtrl.repeat(reverse: true);
-    HapticFeedback.mediumImpact();
+    appHaptic(ref, type: HapticType.medium);
+    appSound(ref, type: SoundType.tap);
   }
 
   void _onLongPressEnd(LongPressEndDetails _) {

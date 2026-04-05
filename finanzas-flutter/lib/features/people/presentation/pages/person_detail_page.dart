@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_providers.dart';
 import '../../../../core/logic/people_service.dart';
+import '../../../../core/services/firestore_service.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../domain/models/person.dart';
 import '../../../transactions/domain/models/transaction.dart' as dom_tx;
@@ -71,18 +72,8 @@ class PersonDetailPage extends ConsumerWidget {
           SliverToBoxAdapter(
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 36,
-                  backgroundColor:
-                      livePerson.avatarColor.withValues(alpha: 0.2),
-                  child: Text(
-                    livePerson.displayName[0].toUpperCase(),
-                    style: TextStyle(
-                        color: livePerson.avatarColor,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 28),
-                  ),
-                ),
+                // Avatar — show Firebase photo if linked
+                _LinkedAvatar(person: livePerson),
                 const SizedBox(height: 12),
                 Text(livePerson.displayName,
                     style: GoogleFonts.inter(
@@ -93,6 +84,29 @@ class PersonDetailPage extends ConsumerWidget {
                   Text(livePerson.name,
                       style: const TextStyle(
                           color: Colors.white38, fontSize: 14)),
+                if (livePerson.isLinked)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF5ECFB1).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.link_rounded, size: 12, color: Color(0xFF5ECFB1)),
+                          const SizedBox(width: 4),
+                          Text('Vinculado',
+                              style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF5ECFB1))),
+                        ],
+                      ),
+                    ),
+                  ),
                 if (livePerson.cbu != null && livePerson.cbu!.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   GestureDetector(
@@ -1055,6 +1069,51 @@ class _TransactionRow extends StatelessWidget {
             ),
           ),
         ),
+    );
+  }
+}
+
+/// Avatar widget that shows Firebase photo for linked friends.
+class _LinkedAvatar extends ConsumerWidget {
+  final Person person;
+  const _LinkedAvatar({required this.person});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!person.isLinked) {
+      return CircleAvatar(
+        radius: 36,
+        backgroundColor: person.avatarColor.withValues(alpha: 0.2),
+        child: Text(
+          person.displayName[0].toUpperCase(),
+          style: TextStyle(
+              color: person.avatarColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 28),
+        ),
+      );
+    }
+
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: ref.read(firestoreServiceProvider).fetchUserDoc(person.linkedUserId!),
+      builder: (context, snapshot) {
+        final photoUrl = snapshot.data?['photoUrl'] as String?;
+
+        return CircleAvatar(
+          radius: 36,
+          backgroundColor: person.avatarColor.withValues(alpha: 0.2),
+          backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+          child: photoUrl == null
+              ? Text(
+                  person.displayName[0].toUpperCase(),
+                  style: TextStyle(
+                      color: person.avatarColor,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 28),
+                )
+              : null,
+        );
+      },
     );
   }
 }

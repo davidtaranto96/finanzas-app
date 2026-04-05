@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/providers/feedback_provider.dart';
 import '../../../../core/database/database_providers.dart';
 import '../../../../core/logic/people_service.dart';
 import '../../../../core/providers/friend_requests_provider.dart';
@@ -136,7 +136,8 @@ class _PeoplePageState extends ConsumerState<PeoplePage>
 
 /// Top-level so the shell's MorphingFab can call it too.
 void showPeopleFabMenu(BuildContext context, WidgetRef ref) {
-    HapticFeedback.mediumImpact();
+    appHaptic(ref, type: HapticType.medium);
+    appSound(ref, type: SoundType.tap);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -194,10 +195,21 @@ void showPeopleFabMenu(BuildContext context, WidgetRef ref) {
             ),
             const SizedBox(height: 10),
             _MenuOption(
+              icon: Icons.qr_code_scanner_rounded,
+              color: const Color(0xFF5ECFB1),
+              title: 'Escanear QR de amigo',
+              subtitle: 'Escaneá el código de tu amigo',
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/link-friend');
+              },
+            ),
+            const SizedBox(height: 10),
+            _MenuOption(
               icon: Icons.person_add_rounded,
               color: Colors.white54,
-              title: 'Agregar amigo',
-              subtitle: 'Nuevo contacto para compartir',
+              title: 'Agregar manualmente',
+              subtitle: 'Nuevo contacto sin vincular',
               onTap: () {
                 Navigator.pop(context);
                 showAddPersonSheet(context, ref);
@@ -648,6 +660,21 @@ void _showLiquidateAmountSheet(BuildContext context, WidgetRef ref, Person perso
                               amount: actualAmount,
                               accountId: selectedSource?.id,
                             );
+
+                            // Notificar al amigo vinculado
+                            if (person.isLinked) {
+                              try {
+                                final firestoreService = ref.read(firestoreServiceProvider);
+                                await firestoreService.createDebtSettlement(
+                                  friendUid: person.linkedUserId!,
+                                  amount: actualAmount,
+                                  description: actualAmount > 0
+                                      ? '${person.displayName} te pagó'
+                                      : 'Pago a ${person.displayName}',
+                                );
+                              } catch (_) {}
+                            }
+
                             if (context.mounted) Navigator.pop(ctx);
                           },
                     style: FilledButton.styleFrom(
@@ -757,8 +784,14 @@ class _IncomingExpenseBannerState extends ConsumerState<_IncomingExpenseBanner> 
       if (match.isNotEmpty) {
         personId = match.first.id;
       } else {
-        // Crear persona nueva si no existe
-        personId = await peopleService.addPerson(name: 'Amigo');
+        // Buscar nombre real del sender en Firestore
+        String senderName = 'Amigo';
+        try {
+          final firestoreService = ref.read(firestoreServiceProvider);
+          final userDoc = await firestoreService.fetchUserDoc(widget.expense.createdByUid);
+          senderName = userDoc?['displayName'] as String? ?? 'Amigo';
+        } catch (_) {}
+        personId = await peopleService.addPerson(name: senderName);
         await peopleService.setLinkedUser(personId, widget.expense.createdByUid);
       }
 
