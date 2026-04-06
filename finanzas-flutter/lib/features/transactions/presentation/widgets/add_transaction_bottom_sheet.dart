@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -378,6 +379,72 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
         NLScenario.createBudget,
       ));
     }
+
+    // ── Vincular amigo / QR ──
+    if (lower.contains('qr') || lower.contains('vincular') || lower.contains('escanear') ||
+        lower.contains('linkear') || lower.contains('scan') ||
+        (lower.contains('amigo') && (lower.contains('agregar') || lower.contains('añadir') || lower.contains('nuevo')))) {
+      suggestions.add(_SuggestionItem('📱 Vincular amigo por QR', 'Agregar amigo por QR', NLScenario.navigateTo));
+    }
+
+    // ── Solicitudes de amistad ──
+    if (lower.contains('solicitud') || lower.contains('solicitudes') ||
+        (lower.contains('pedido') && lower.contains('amig'))) {
+      suggestions.add(_SuggestionItem('🤝 Ver solicitudes de amistad', 'Ver solicitudes', NLScenario.navigateTo));
+    }
+
+    // ── Person-name-aware completions ──
+    final matchedPerson = people.where((p) => p.name.length > 2 && lower.contains(p.name.toLowerCase())).firstOrNull;
+    if (matchedPerson != null) {
+      final pName = matchedPerson.name;
+      final hasActionWord = lower.contains('dividí') || lower.contains('presté') ||
+          lower.contains('pagué') || lower.contains('saldar') || lower.contains('me devolvió');
+      if (!hasActionWord && amount != null) {
+        suggestions.add(_SuggestionItem(
+          '👥 Gasto compartido con $pName$amtStr',
+          'Dividí $amtNum con $pName',
+          NLScenario.sharedExpense,
+        ));
+      }
+      if (!hasActionWord && matchedPerson.totalBalance != 0) {
+        if (matchedPerson.owesMe) {
+          suggestions.add(_SuggestionItem(
+            '💸 Cobrar a $pName',
+            'Saldar deuda con $pName',
+            NLScenario.settleDebt,
+          ));
+        } else {
+          suggestions.add(_SuggestionItem(
+            '💸 Pagarle a $pName',
+            'Le pagué a $pName',
+            NLScenario.loanRepayment,
+          ));
+        }
+      }
+      if (!lower.contains('cuánto') && !lower.contains('cuanto') && !hasActionWord && amount == null) {
+        suggestions.add(_SuggestionItem(
+          '🤔 Deuda con $pName',
+          '¿Cuánto le debo a $pName?',
+          NLScenario.queryDebt,
+        ));
+      }
+    }
+
+    // ── "Cuánto…" prefix — deuda o saldo ──
+    if ((lower.startsWith('cuánt') || lower.startsWith('cuant') || lower.startsWith('qué') || lower.startsWith('que')) &&
+        !lower.contains('tengo') && !lower.contains('hay') &&
+        !lower.contains('gasté') && !lower.contains('gaste') &&
+        !lower.contains('presupuesto')) {
+      final debtStr = firstName != null ? '¿Cuánto le debo a $firstName?' : '¿Cuánto me deben?';
+      suggestions.add(_SuggestionItem('🤔 Consultar deuda', debtStr, NLScenario.queryDebt));
+    }
+
+    // ── Mis amigos ──
+    if ((lower.contains('mis amigos') || lower.contains('mis contactos') || lower.contains('ver amigos') ||
+         lower.contains('lista de amigos')) && suggestions.isEmpty) {
+      suggestions.add(_SuggestionItem('👥 Ver mis amigos', 'Abrir lista de personas', NLScenario.navigateTo));
+    }
+
     // ── Default: gasto si hay monto ──
     if (suggestions.isEmpty && amount != null) {
       suggestions.add(_SuggestionItem('💸 Gasto$amtStr', 'Gasté $amtNum en supermercado', NLScenario.expense));
@@ -709,8 +776,29 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
         case NLScenario.navigateTo:
           final target = tx.navigationTarget;
           if (target != null && mounted) {
+            final router = GoRouter.of(context);
             Navigator.of(context).pop();
-            ref.read(navigateToTabProvider.notifier).state = target;
+            if (target == 'link_friend') {
+              router.push('/link-friend');
+            } else if (target == 'friend_requests') {
+              router.push('/friend-requests');
+            } else {
+              ref.read(navigateToTabProvider.notifier).state = target;
+              // If navigating to people and a person was detected, show a hint
+              if (target == 'people' && tx.personName != null) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Row(children: [
+                    const Icon(Icons.person_search_rounded, color: Colors.white, size: 16),
+                    const SizedBox(width: 8),
+                    Text('Buscá a ${tx.personName} en tu lista'),
+                  ]),
+                  backgroundColor: const Color(0xFF6C63FF).withValues(alpha: 0.9),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  duration: const Duration(seconds: 3),
+                ));
+              }
+            }
           }
           return;
 
@@ -746,8 +834,41 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
 
         case NLScenario.queryDebt:
           if (mounted) {
+            final personId = tx.personId;
+            final peopleList = ref.read(peopleStreamProvider).value ?? [];
+            final matchPerson = personId != null
+                ? peopleList.where((p) => p.id == personId).firstOrNull
+                : (tx.personName != null
+                    ? peopleList.where((p) => p.name.toLowerCase() == tx.personName!.toLowerCase()).firstOrNull
+                    : null);
             Navigator.of(context).pop();
             ref.read(navigateToTabProvider.notifier).state = 'people';
+            if (matchPerson != null) {
+              final balance = matchPerson.totalBalance;
+              final String msg;
+              final Color color;
+              if (balance == 0) {
+                msg = 'Estás al día con ${matchPerson.name} ✓';
+                color = const Color(0xFF4CAF50);
+              } else if (matchPerson.owesMe) {
+                msg = '${matchPerson.name} te debe \$${formatAmount(balance)}';
+                color = const Color(0xFF4CAF50);
+              } else {
+                msg = 'Le debés \$${formatAmount(balance.abs())} a ${matchPerson.name}';
+                color = Colors.orange.shade700;
+              }
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Row(children: [
+                  const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(msg)),
+                ]),
+                backgroundColor: color.withValues(alpha: 0.9),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                duration: const Duration(seconds: 4),
+              ));
+            }
           }
           return;
 
@@ -899,7 +1020,7 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Escribí o dictá tu movimiento en lenguaje natural.',
+          'Escribí o dictá un movimiento, consulta o acción.',
           style: GoogleFonts.inter(color: cs.onSurfaceVariant, fontSize: 13),
         ),
         const SizedBox(height: 16),
@@ -959,7 +1080,7 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
                         maxLines: 3,
                         minLines: 1,
                         decoration: InputDecoration(
-                          hintText: 'Ej. Pagué 45 mil de sushi con Juan...',
+                          hintText: 'Ej. "Dividí 8k con Juan" o "Cuánto le debo a Ana?"...',
                           hintStyle: GoogleFonts.inter(color: Colors.white30, fontSize: 14),
                           border: InputBorder.none,
                           isDense: true,
@@ -1038,11 +1159,21 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
                 const SizedBox(width: 8),
                 _ExampleChip('Presté 10k a Juan', _aiController, () => setState(() {})),
                 const SizedBox(width: 8),
+                _ExampleChip('Cuánto le debo a Juan?', _aiController, () => setState(() {})),
+                const SizedBox(width: 8),
+                _ExampleChip('Saldar deuda con María', _aiController, () => setState(() {})),
+                const SizedBox(width: 8),
+                _ExampleChip('Agregar amigo por QR', _aiController, () => setState(() {})),
+                const SizedBox(width: 8),
+                _ExampleChip('Ver solicitudes de amistad', _aiController, () => setState(() {})),
+                const SizedBox(width: 8),
                 _ExampleChip('Ir a reportes', _aiController, () => setState(() {})),
                 const SizedBox(width: 8),
                 _ExampleChip('Cuánto tengo?', _aiController, () => setState(() {})),
                 const SizedBox(width: 8),
                 _ExampleChip('Agregar a Pedro', _aiController, () => setState(() {})),
+                const SizedBox(width: 8),
+                _ExampleChip('Mis amigos', _aiController, () => setState(() {})),
               ],
             ),
           ),
@@ -1552,10 +1683,19 @@ class _AiConfirmationCardState extends ConsumerState<_AiConfirmationCard> {
           'goals': 'Objetivos', 'people': 'Personas', 'reports': 'Reportes',
           'accounts': 'Cuentas', 'monthly_overview': 'Resumen mensual',
           'wishlist': 'Lista de compras', 'savings': 'Ahorros',
+          'link_friend': 'Vincular amigo por QR',
+          'friend_requests': 'Solicitudes de amistad',
         };
         final dest = tabNames[_tx.navigationTarget] ?? _tx.navigationTarget ?? 'esa sección';
-        title = 'Navegar a $dest';
-        body = 'Te llevo directo a $dest.';
+        final isPersonNav = _tx.navigationTarget == 'people' && _tx.personName != null;
+        title = isPersonNav ? 'Buscar a ${_tx.personName}' : 'Navegar a $dest';
+        body = isPersonNav
+            ? 'Abriendo lista de personas. Tocá a ${_tx.personName} para ver su ventana.'
+            : _tx.navigationTarget == 'link_friend'
+                ? 'Abre el escáner de QR para vincular un nuevo amigo.'
+                : _tx.navigationTarget == 'friend_requests'
+                    ? 'Ver solicitudes de amistad recibidas y enviadas.'
+                    : 'Te llevo directo a $dest.';
         actionLabel = 'Ir ahora →';
         break;
       case NLScenario.createPerson:

@@ -21,11 +21,26 @@ class NovedadesPage extends StatelessWidget {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         children: [
+          // v1.5.4
+          _VersionCard(
+            version: 'v1.5.4',
+            date: '6 Abr 2026',
+            isCurrent: true,
+            items: const [
+              _ChangeItem(icon: Icons.auto_awesome_rounded, text: 'IA mejorada: ahora entendé comandos de amigos, gastos compartidos, deudas y navegación a personas', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.qr_code_scanner_rounded, text: 'Comando "Agregar amigo por QR" desde la IA abre directo el escáner', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.mark_email_read_rounded, text: 'Comando "Ver solicitudes" desde la IA abre la pantalla de solicitudes de amistad', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.account_balance_wallet_rounded, text: 'Comando "Cuánto le debo a Juan" responde con el balance exacto y navega a Personas', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.psychology_rounded, text: 'Predicciones inteligentes: si escribís un nombre de persona se sugieren acciones relevantes con ella', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.lightbulb_rounded, text: 'Más ejemplos rápidos: Saldar deuda, Ver solicitudes, Mis amigos, entre otros', type: _ChangeType.improvement),
+            ],
+          ),
+
           // v1.5.3
           _VersionCard(
             version: 'v1.5.3',
             date: '5 Abr 2026',
-            isCurrent: true,
+            isCurrent: false,
             items: const [
               _ChangeItem(icon: Icons.person_rounded, text: 'Ventana de persona rediseñada: hero card con gradiente y balance grande y legible', type: _ChangeType.improvement),
               _ChangeItem(icon: Icons.bolt_rounded, text: 'Acciones rápidas siempre visibles: Nuevo gasto, Liquidar y Deuda anterior sin importar el saldo', type: _ChangeType.improvement),

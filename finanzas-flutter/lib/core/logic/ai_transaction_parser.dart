@@ -138,13 +138,16 @@ ESCENARIOS POSIBLES:
 - "internal_transfer": transferí plata entre dos cuentas propias del usuario.
 - "create_goal": crear un nuevo objetivo de ahorro (ej: "crear objetivo viaje a Mendoza 500k").
 - "create_budget": crear un nuevo presupuesto (ej: "crear presupuesto comida 100k").
-- "navigate_to": el usuario quiere ir a una sección de la app (ej: "ir a reportes", "abrir personas", "mostrar cuentas"). Devolver navigationTarget con uno de: home, transactions, budget, goals, people, reports, accounts, monthly_overview, wishlist, savings.
-- "create_person": el usuario quiere agregar un contacto nuevo (ej: "agregar a Martín", "nuevo amigo Pedro"). Devolver personName con el nombre detectado.
+- "navigate_to": el usuario quiere ir a una sección de la app (ej: "ir a reportes", "abrir personas", "mostrar cuentas"). Devolver navigationTarget con uno de: home, transactions, budget, goals, people, reports, accounts, monthly_overview, wishlist, savings, link_friend, friend_requests.
+  * "link_friend": usuario dice "vincular amigo", "escanear QR", "agregar amigo por QR", "linkear", "scan amigo"
+  * "friend_requests": usuario dice "ver solicitudes", "solicitudes de amistad", "mis solicitudes", "pedidos de amistad"
+  * "people": usuario dice "ver mis amigos", "mis contactos", "abrir personas", "lista de amigos"
+- "create_person": el usuario quiere agregar un contacto nuevo (ej: "agregar a Martín", "nuevo contacto Pedro"). Devolver personName con el nombre detectado.
 - "query_balance": el usuario pregunta por su saldo (ej: "cuánto tengo?", "cuánto hay en mi cuenta?"). No crear transacción.
 - "query_budget": el usuario pregunta por el estado de un presupuesto (ej: "cómo va mi presupuesto de comida?"). Devolver categoryId o title con el presupuesto relevante.
-- "query_debt": el usuario pregunta por una deuda con alguien (ej: "cuánto me debe Juan?", "qué le debo a María?"). Devolver personId o personName.
+- "query_debt": el usuario pregunta por una deuda con alguien (ej: "cuánto me debe Juan?", "qué le debo a María?", "cuánto le debo a Pedro?"). Devolver personId o personName si se detecta a alguien.
 - "duplicate_last_tx": el usuario quiere repetir su último movimiento (ej: "lo mismo de ayer", "repetir el último gasto", "igual que ayer"). No necesita monto.
-- "settle_debt": el usuario quiere saldar la deuda completa con alguien (ej: "saldar todo con Juan", "liquidar la deuda con María"). Devolver personId o personName.
+- "settle_debt": el usuario quiere saldar la deuda completa con alguien (ej: "saldar todo con Juan", "liquidar la deuda con María", "le pagué todo a Pedro"). Devolver personId o personName.
 - "unclear": no se puede determinar con certeza.
 
 CATEGORÍAS VÁLIDAS (usar exactamente estos IDs):
@@ -326,13 +329,56 @@ REGLAS IMPORTANTES:
       );
     }
 
+    // ── Vincular amigo / QR scanner ──
+    if (lower.contains('vincular') || lower.contains('escanear') || lower.contains('linkear') ||
+        lower.contains('scan') ||
+        (lower.contains('agregar') && lower.contains('amigo')) ||
+        (lower.contains('añadir') && lower.contains('amigo')) ||
+        (lower.contains('nuevo') && lower.contains('amigo') && !lower.contains('presupuesto')) ||
+        (lower.contains('qr') && !lower.contains('mostrar qr') && !lower.contains('mi qr'))) {
+      return NLTransaction(scenario: NLScenario.navigateTo, navigationTarget: 'link_friend', rawInput: input);
+    }
+
+    // ── Solicitudes de amistad ──
+    if (lower.contains('solicitud') || lower.contains('solicitudes') ||
+        (lower.contains('pedido') && lower.contains('amig'))) {
+      return NLTransaction(scenario: NLScenario.navigateTo, navigationTarget: 'friend_requests', rawInput: input);
+    }
+
+    // ── Ver a persona específica / deuda de persona ──
+    if (lower.contains('ver a ') || lower.contains('abrir a ') || lower.contains('ir a ver')) {
+      dom_p.Person? match;
+      for (final p in people) {
+        if (lower.contains(p.name.toLowerCase())) { match = p; break; }
+      }
+      if (match != null) {
+        return NLTransaction(
+          scenario: NLScenario.navigateTo,
+          navigationTarget: 'people',
+          personId: match.id,
+          personName: match.name,
+          rawInput: input,
+        );
+      }
+    }
+
+    // ── Mis amigos / Ver lista de amigos ──
+    if ((lower.contains('mis amigos') || lower.contains('mis contactos') ||
+         lower.contains('lista de amigos') || lower.contains('ver amigos') ||
+         lower.contains('mis personas')) &&
+        !lower.contains('presupuesto') && !lower.contains('objetivo')) {
+      return NLTransaction(scenario: NLScenario.navigateTo, navigationTarget: 'people', rawInput: input);
+    }
+
     // ── Navegar a sección ──
     if (lower.contains('ir a') || lower.contains('abrir') || lower.contains('ir al') ||
         lower.contains('mostrar') || lower.contains('llevame') || lower.contains('llevame a') ||
         lower.contains('llévame')) {
       String? target;
       if (lower.contains('report') || lower.contains('estadística') || lower.contains('estadistica')) { target = 'reports'; }
-      else if (lower.contains('persona') || lower.contains('amigo') || lower.contains('gente')) { target = 'people'; }
+      else if (lower.contains('solicitud') || lower.contains('solicitudes')) { target = 'friend_requests'; }
+      else if (lower.contains('vincular') || lower.contains('qr')) { target = 'link_friend'; }
+      else if (lower.contains('persona') || lower.contains('amigo') || lower.contains('gente') || lower.contains('contacto')) { target = 'people'; }
       else if (lower.contains('presupuesto')) { target = 'budget'; }
       else if (lower.contains('cuenta')) { target = 'accounts'; }
       else if (lower.contains('objetivo') || lower.contains('meta')) { target = 'goals'; }
@@ -372,7 +418,10 @@ REGLAS IMPORTANTES:
     }
     if (lower.contains('cuánto me debe') || lower.contains('cuanto me debe') ||
         lower.contains('me debe') || lower.contains('le debo') ||
-        lower.contains('deuda con') || lower.contains('cuánto le debo') || lower.contains('cuanto le debo')) {
+        lower.contains('deuda con') || lower.contains('cuánto le debo') || lower.contains('cuanto le debo') ||
+        lower.contains('cuánto debo') || lower.contains('cuanto debo') ||
+        lower.contains('qué le debo') || lower.contains('que le debo') ||
+        (lower.contains('balance') && lower.contains('con'))) {
       // Try to find person name
       String? personId;
       String? personName;
