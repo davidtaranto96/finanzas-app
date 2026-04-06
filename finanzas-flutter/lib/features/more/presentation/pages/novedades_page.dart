@@ -21,6 +21,10 @@ class NovedadesPage extends StatelessWidget {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         children: [
+          // ── Header versión actual ──
+          _CurrentVersionBanner(),
+          const SizedBox(height: 20),
+
           // v1.5.4
           _VersionCard(
             version: 'v1.5.4',
@@ -482,6 +486,110 @@ class _RoadmapItem extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.6),
                 fontWeight: FontWeight.w500,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Banner de versión actual
+// ─────────────────────────────────────────────────────────
+class _CurrentVersionBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.colorTransfer.withValues(alpha: 0.12),
+            AppTheme.colorIncome.withValues(alpha: 0.06),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.colorTransfer.withValues(alpha: 0.20)),
+      ),
+      child: Row(
+        children: [
+          // Icono animado
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppTheme.colorTransfer.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(Icons.rocket_launch_rounded, color: AppTheme.colorTransfer, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Sencillo',
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.colorTransfer.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.colorTransfer.withValues(alpha: 0.35)),
+                      ),
+                      child: Text(
+                        'v1.5.4',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.colorTransfer,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Versión actual · 6 de Abril 2026',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: Colors.white38,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Badge "Al día"
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppTheme.colorIncome.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle_rounded, size: 12, color: AppTheme.colorIncome),
+                const SizedBox(width: 4),
+                Text(
+                  'Al día',
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.colorIncome),
+                ),
+              ],
             ),
           ),
         ],

@@ -203,6 +203,7 @@ class _MorePageState extends ConsumerState<MorePage>
                       _CompactRow(
                         icon: Icons.rocket_launch_rounded,
                         label: 'Novedades',
+                        subtitle: 'Versión actual: v1.5.4',
                         color: AppTheme.colorIncome,
                         onTap: () => context.push('/novedades'),
                       ),
@@ -336,13 +337,16 @@ class _MorePageState extends ConsumerState<MorePage>
               child: Padding(
                 padding: const EdgeInsets.only(top: 20, bottom: 8),
                 child: Center(
-                  child: Text(
-                    'Sencillo · v1.4.1',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white.withValues(alpha: 0.15),
-                      letterSpacing: 1.5,
+                  child: GestureDetector(
+                    onTap: () => context.push('/novedades'),
+                    child: Text(
+                      'Sencillo · v1.5.4',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.20),
+                        letterSpacing: 1.5,
+                      ),
                     ),
                   ),
                 ),
