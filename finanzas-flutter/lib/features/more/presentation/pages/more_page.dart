@@ -357,7 +357,7 @@ class _MorePageState extends ConsumerState<MorePage>
               ),
             ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 120)),
+            SliverToBoxAdapter(child: SizedBox(height: 70 + MediaQuery.of(context).padding.bottom + 24)),
           ],
         ),
       ),

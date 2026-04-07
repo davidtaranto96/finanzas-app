@@ -303,7 +303,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage>
                   ),
                 ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 160)),
+              SliverToBoxAdapter(child: SizedBox(height: 70 + MediaQuery.of(context).padding.bottom + 24)),
             ],
           ),
         );

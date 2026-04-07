@@ -180,7 +180,6 @@ class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClie
         ),
         const SizedBox(height: 8),
         _CollapsibleTransactions(transactions: transactions),
-        const SizedBox(height: 120),
       ],
     };
 
@@ -205,6 +204,9 @@ class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClie
         result.addAll(widgets);
       }
     }
+    // Padding dinámico para que nada quede detrás del nav bar
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    result.add(SizedBox(height: 70 + bottomInset + 24));
     return result;
   }
 

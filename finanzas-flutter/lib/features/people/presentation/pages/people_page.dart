@@ -1019,8 +1019,9 @@ class _FriendsTab extends ConsumerWidget {
         return a.displayName.compareTo(b.displayName);
       });
 
+    final bottomPad = 70 + MediaQuery.of(context).padding.bottom + 24;
     return ListView.builder(
-      padding: const EdgeInsets.only(top: 4, bottom: 120),
+      padding: EdgeInsets.only(top: 4, bottom: bottomPad),
       physics: const BouncingScrollPhysics(),
       itemCount: sorted.length,
       itemBuilder: (context, index) =>
@@ -1165,8 +1166,9 @@ class _GroupsTab extends ConsumerWidget {
           );
         }
 
+        final bottomPad = 70 + MediaQuery.of(context).padding.bottom + 24;
         return ListView.builder(
-          padding: const EdgeInsets.only(top: 4, bottom: 120),
+          padding: EdgeInsets.only(top: 4, bottom: bottomPad),
           physics: const BouncingScrollPhysics(),
           itemCount: groups.length,
           itemBuilder: (context, index) =>
@@ -1300,8 +1302,9 @@ class _ActivityTab extends ConsumerWidget {
           grouped.putIfAbsent(key, () => []).add(tx);
         }
 
+        final bottomPad = 70 + MediaQuery.of(context).padding.bottom + 24;
         return ListView.builder(
-          padding: const EdgeInsets.only(top: 4, bottom: 120),
+          padding: EdgeInsets.only(top: 4, bottom: bottomPad),
           physics: const BouncingScrollPhysics(),
           itemCount: grouped.length,
           itemBuilder: (context, index) {

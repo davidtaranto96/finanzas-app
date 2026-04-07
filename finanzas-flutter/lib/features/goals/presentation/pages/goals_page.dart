@@ -179,7 +179,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage>
               ),
             ],
 
-            const SliverToBoxAdapter(child: SizedBox(height: 120)),
+            SliverToBoxAdapter(child: SizedBox(height: 70 + MediaQuery.of(context).padding.bottom + 24)),
           ],
         ),
       ),

@@ -223,7 +223,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage>
               ),
             ],
 
-            const SliverToBoxAdapter(child: SizedBox(height: 140)),
+            SliverToBoxAdapter(child: SizedBox(height: 70 + MediaQuery.of(context).padding.bottom + 24)),
           ],
         ),
       ),
