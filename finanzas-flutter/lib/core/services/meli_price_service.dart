@@ -36,16 +36,30 @@ class MeliSearchResult {
   final String itemId;
   final String title;
   final double price;
+  final double? originalPrice;
   final String? thumbnail;
   final String permalink;
+  final int? installmentQty;
+  final double? installmentAmount;
+  final bool freeShipping;
 
   const MeliSearchResult({
     required this.itemId,
     required this.title,
     required this.price,
+    this.originalPrice,
     this.thumbnail,
     required this.permalink,
+    this.installmentQty,
+    this.installmentAmount,
+    this.freeShipping = false,
   });
+
+  /// Discount percentage (if originalPrice exists and is higher).
+  double? get discountPercent {
+    if (originalPrice == null || originalPrice! <= price) return null;
+    return ((originalPrice! - price) / originalPrice! * 100);
+  }
 }
 
 class MeliPriceService {
@@ -184,13 +198,14 @@ class MeliPriceService {
   }
 
   /// Search MeLi for products matching a query.
+  /// Uses the public search endpoint which doesn't require authentication.
   static Future<List<MeliSearchResult>> search(String query, {int limit = 5}) async {
     try {
-      final token = await _getAccessToken();
+      // Search endpoint works without auth — don't send token to avoid 403
       final uri = Uri.parse('$_baseUrl/sites/MLA/search')
           .replace(queryParameters: {'q': query, 'limit': '$limit'});
 
-      final response = await http.get(uri, headers: _headers(token: token)).timeout(_timeout);
+      final response = await http.get(uri, headers: _headers()).timeout(_timeout);
       if (response.statusCode != 200) {
         lastError = 'Búsqueda: HTTP ${response.statusCode}';
         return [];
@@ -201,12 +216,18 @@ class MeliPriceService {
 
       return results.map((r) {
         final item = r as Map<String, dynamic>;
+        // Extract installments info from search results
+        final installments = item['installments'] as Map<String, dynamic>?;
         return MeliSearchResult(
           itemId: item['id'] as String? ?? '',
           title: item['title'] as String? ?? '',
           price: (item['price'] as num?)?.toDouble() ?? 0,
+          originalPrice: (item['original_price'] as num?)?.toDouble(),
           thumbnail: item['thumbnail'] as String?,
           permalink: item['permalink'] as String? ?? '',
+          installmentQty: (installments?['quantity'] as num?)?.toInt(),
+          installmentAmount: (installments?['amount'] as num?)?.toDouble(),
+          freeShipping: (item['shipping'] as Map<String, dynamic>?)?['free_shipping'] as bool? ?? false,
         );
       }).toList();
     } catch (e) {

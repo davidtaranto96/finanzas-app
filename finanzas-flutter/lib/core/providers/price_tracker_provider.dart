@@ -192,16 +192,23 @@ class PriceTrackerNotifier extends StateNotifier<Map<String, PriceHistory>> {
       }
     }
 
-    // Fallback: search MeLi by item title
+    // Fallback: search by title (search endpoint doesn't need auth)
     if (item.title.isNotEmpty) {
       final searchResults = await MeliPriceService.search(item.title, limit: 1);
       if (searchResults.isNotEmpty) {
         final top = searchResults.first;
-        final detailed = await MeliPriceService.fetchItemPrice(top.itemId);
-        if (detailed != null) {
-          await logPrice(item.id, detailed.price, source: 'meli');
-          return detailed;
-        }
+        // Use search result directly instead of calling /items/ again (avoids 403)
+        final result = MeliPriceResult(
+          itemId: top.itemId,
+          title: top.title,
+          price: top.price,
+          originalPrice: top.originalPrice,
+          thumbnail: top.thumbnail,
+          permalink: top.permalink,
+          checkedAt: DateTime.now(),
+        );
+        await logPrice(item.id, result.price, source: 'meli');
+        return result;
       }
     }
 
