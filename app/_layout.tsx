@@ -5,8 +5,12 @@ import { View, Text } from 'react-native';
 import { PaperProvider } from 'react-native-paper';
 import { runMigrations } from '@/src/db/migrations';
 import { seedDatabase } from '@/src/db/seeds';
+import { useAuthStore } from '@/src/stores/authStore';
 import { colors } from '@/src/lib/theme';
 import { paperTheme } from '@/src/lib/paperTheme';
+
+// Firebase se importa para inicializar la app al cargar el módulo
+import '@/src/lib/firebase';
 
 // Error boundary para capturar crashes antes de mostrarlos en pantalla
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -30,6 +34,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 }
 
 export default function RootLayout() {
+  const initAuth = useAuthStore((s) => s.init);
+
   useEffect(() => {
     async function init() {
       try {
@@ -40,6 +46,10 @@ export default function RootLayout() {
       }
     }
     init();
+
+    // Iniciar listener de Firebase Auth
+    const unsubAuth = initAuth();
+    return () => unsubAuth();
   }, []);
 
   return (
@@ -80,6 +90,34 @@ export default function RootLayout() {
             <Stack.Screen
               name="gastos-fijos/index"
               options={{ presentation: 'card', animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="novedades"
+              options={{ presentation: 'card', animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="profile"
+              options={{ presentation: 'card', animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="onboarding"
+              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen
+              name="friends/index"
+              options={{ presentation: 'card', animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="friends/my-qr"
+              options={{ presentation: 'card', animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="friends/scan"
+              options={{ presentation: 'card', animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="(auth)"
+              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
             />
           </Stack>
         </View>

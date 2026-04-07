@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback, useMemo } from 'react';
 import { View, FlatList, StyleSheet, SectionList } from 'react-native';
-import { Text, Surface, FAB, Searchbar, Divider } from 'react-native-paper';
+import { Text, Surface, Searchbar, Divider } from 'react-native-paper';
+import { useFab } from '@/src/hooks/useFab';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTransactionStore } from '@/src/stores/transactionStore';
@@ -43,6 +44,11 @@ export default function MovimientosScreen() {
     loadCategories();
     loadAccounts();
   }, []);
+
+  useFab({
+    icon: 'plus',
+    onPress: () => router.push('/transaction/new'),
+  });
 
   // useMemo para evitar re-renders por nueva referencia de array
   const filtered = useMemo(() => {
@@ -127,13 +133,6 @@ export default function MovimientosScreen() {
         />
       )}
 
-      {/* FAB */}
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        color="#FFFFFF"
-        onPress={() => router.push('/transaction/new')}
-      />
     </View>
   );
 }
@@ -201,11 +200,5 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     color: colors.text.muted,
     textAlign: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    right: spacing.base,
-    bottom: spacing['2xl'],
-    backgroundColor: colors.brand.primary,
   },
 });

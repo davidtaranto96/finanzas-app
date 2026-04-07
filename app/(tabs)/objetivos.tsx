@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
 import {
-  Text, Surface, FAB, Portal, Modal, Button, TextInput,
+  Text, Surface, Portal, Modal, Button, TextInput,
   ProgressBar, Divider,
 } from 'react-native-paper';
+import { useFab } from '@/src/hooks/useFab';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useGoalStore } from '@/src/stores/goalStore';
@@ -75,6 +76,11 @@ export default function ObjetivosScreen() {
   useEffect(() => {
     load();
   }, []);
+
+  useFab({
+    icon: 'plus',
+    onPress: () => setModalVisible(true),
+  });
 
   function handleCreate() {
     const target = parseFloat(newTarget);
@@ -188,12 +194,6 @@ export default function ObjetivosScreen() {
         </Modal>
       </Portal>
 
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        color="#FFFFFF"
-        onPress={() => setModalVisible(true)}
-      />
     </View>
   );
 }
@@ -302,12 +302,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     color: colors.text.muted,
     textAlign: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    right: spacing.base,
-    bottom: spacing['2xl'],
-    backgroundColor: colors.brand.primary,
   },
   modal: {
     margin: spacing.base,

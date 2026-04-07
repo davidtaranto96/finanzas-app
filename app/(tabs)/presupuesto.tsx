@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { Text, Surface, ProgressBar, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNoFab } from '@/src/hooks/useFab';
 import { useCategoryStore } from '@/src/stores/categoryStore';
 import { budgetService } from '@/src/services/budgetService';
 import { transactionService } from '@/src/services/transactionService';
@@ -20,6 +21,7 @@ const BUCKET_ICONS: Record<string, string> = {
 };
 
 export default function PresupuestoScreen() {
+  useNoFab();
   const { categories, load: loadCategories } = useCategoryStore();
   const [salaryRule, setSalaryRule] = React.useState<ReturnType<typeof budgetService.getSalaryRule>>(null);
   const [categorySpending, setCategorySpending] = React.useState<{ categoryId: string; total: number }[]>([]);

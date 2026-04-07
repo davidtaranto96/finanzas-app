@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback, useMemo } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, RefreshControl } from 'react-native';
-import { Text, Surface, FAB, Portal, Divider } from 'react-native-paper';
+import { Text, Surface, Divider } from 'react-native-paper';
+import { useFab } from '@/src/hooks/useFab';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAccountStore } from '@/src/stores/accountStore';
@@ -8,6 +9,8 @@ import { useTransactionStore } from '@/src/stores/transactionStore';
 import { useCategoryStore } from '@/src/stores/categoryStore';
 import { useGoalStore } from '@/src/stores/goalStore';
 import { TransactionItem } from '@/src/components/cards/TransactionItem';
+import { DolarWidget } from '@/src/components/cards/DolarWidget';
+import { useDolarStore } from '@/src/stores/dolarStore';
 import { colors, spacing, radius, typography, shadows } from '@/src/lib/theme';
 import { formatCurrency, formatMonthYear, calcProgress } from '@/src/lib/utils';
 import { ProgressBar } from 'react-native-paper';
@@ -33,18 +36,50 @@ export default function HomeScreen() {
   const { categories, load: loadCategories } = useCategoryStore();
   const { goals, load: loadGoals } = useGoalStore();
 
-  const [fabOpen, setFabOpen] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
+
+  useFab({
+    icon: 'plus',
+    actions: [
+      {
+        icon: 'swap-horizontal',
+        label: 'Transferencia',
+        onPress: () => router.push({ pathname: '/transaction/new', params: { type: 'transfer' } }),
+      },
+      {
+        icon: 'piggy-bank',
+        label: 'Ahorro',
+        onPress: () => router.push({ pathname: '/transaction/new', params: { type: 'saving' } }),
+      },
+      {
+        icon: 'arrow-up-circle',
+        label: 'Ingreso',
+        onPress: () => router.push({ pathname: '/transaction/new', params: { type: 'income' } }),
+      },
+      {
+        icon: 'arrow-down-circle',
+        label: 'Gasto',
+        onPress: () => router.push({ pathname: '/transaction/new', params: { type: 'expense' } }),
+      },
+    ],
+  });
+
+  const fetchDolar = useDolarStore((s) => s.fetch);
+  const startDolarRefresh = useDolarStore((s) => s.startAutoRefresh);
+  const stopDolarRefresh = useDolarStore((s) => s.stopAutoRefresh);
 
   const loadAll = useCallback(() => {
     loadAccounts();
     loadTransactions();
     loadCategories();
     loadGoals();
+    fetchDolar();
   }, []);
 
   useEffect(() => {
     loadAll();
+    startDolarRefresh();
+    return () => stopDolarRefresh();
   }, []);
 
   const onRefresh = useCallback(() => {
@@ -139,6 +174,9 @@ export default function HomeScreen() {
             </View>
           </View>
         </Surface>
+
+        {/* Dólar */}
+        <DolarWidget />
 
         {/* Accounts */}
         {accounts.length > 0 && (
@@ -264,45 +302,6 @@ export default function HomeScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
-
-      {/* FAB */}
-      <Portal>
-        <FAB.Group
-          open={fabOpen}
-          visible
-          icon={fabOpen ? 'close' : 'plus'}
-          color="#FFFFFF"
-          fabStyle={styles.fab}
-          actions={[
-            {
-              icon: 'swap-horizontal',
-              label: 'Transferencia',
-              onPress: () => router.push({ pathname: '/transaction/new', params: { type: 'transfer' } }),
-              style: { backgroundColor: colors.bg.elevated },
-            },
-            {
-              icon: 'piggy-bank',
-              label: 'Ahorro',
-              onPress: () => router.push({ pathname: '/transaction/new', params: { type: 'saving' } }),
-              style: { backgroundColor: colors.bg.elevated },
-            },
-            {
-              icon: 'arrow-up-circle',
-              label: 'Ingreso',
-              onPress: () => router.push({ pathname: '/transaction/new', params: { type: 'income' } }),
-              style: { backgroundColor: colors.bg.elevated },
-            },
-            {
-              icon: 'arrow-down-circle',
-              label: 'Gasto',
-              onPress: () => router.push({ pathname: '/transaction/new', params: { type: 'expense' } }),
-              style: { backgroundColor: colors.bg.elevated },
-            },
-          ]}
-          onStateChange={({ open }) => setFabOpen(open)}
-          style={styles.fabGroup}
-        />
-      </Portal>
     </View>
   );
 }
@@ -491,11 +490,5 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     color: colors.text.muted,
     textAlign: 'center',
-  },
-  fab: {
-    backgroundColor: colors.brand.primary,
-  },
-  fabGroup: {
-    paddingBottom: 80,
   },
 });
