@@ -14,6 +14,7 @@ import 'tables/groups_table.dart';
 import 'tables/persons_table.dart';
 import 'tables/transactions_table.dart';
 import 'tables/user_profile_table.dart';
+import 'tables/recurring_transactions_table.dart';
 import 'tables/wishlist_table.dart';
 
 part 'app_database.g.dart';
@@ -29,12 +30,14 @@ part 'app_database.g.dart';
   GroupMembersTable,
   UserProfileTable,
   WishlistTable,
+  RecurringTransactionsTable,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
+  AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   /// Ensures a default "Efectivo" cash account exists.
   Future<void> ensureDefaultCashAccount() async {
@@ -85,6 +88,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 8) {
         await migrator.addColumn(personsTable, personsTable.linkedUserId);
+      }
+      if (from < 9) {
+        await migrator.createTable(recurringTransactionsTable);
       }
     },
   );

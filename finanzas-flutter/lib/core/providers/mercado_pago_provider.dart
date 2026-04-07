@@ -240,7 +240,7 @@ Future<void> _clearMpCache() async {
 
 /// Ejecuta sincronización de movimientos + balance.
 /// Retorna el resultado o null si no hay conexión.
-Future<MpSyncResult?> syncMercadoPago(WidgetRef ref) async {
+Future<MpSyncResult?> syncMercadoPago(WidgetRef ref, {String? targetAccountId}) async {
   final service = await _getService();
   if (service == null) return null;
 
@@ -250,7 +250,12 @@ Future<MpSyncResult?> syncMercadoPago(WidgetRef ref) async {
   try {
     final db = ref.read(databaseProvider);
     final userId = await _getCachedUserId();
-    final syncService = MpSyncService(db: db, mpService: service, userId: userId);
+    final syncService = MpSyncService(
+      db: db,
+      mpService: service,
+      userId: userId,
+      targetAccountId: targetAccountId,
+    );
 
     final result = await syncService.syncMovements(
       onProgress: (current, total) {

@@ -731,6 +731,11 @@ REGLAS IMPORTANTES:
       }
       } // fin del if (categoryId == 'other_expense')
 
+      // ── Si el título sigue siendo genérico, extraer del input ──
+      if (title == 'Gasto') {
+        title = _extractTitleFromInput(input, amount);
+      }
+
       // Si se usó tarjeta, la cuenta es la tarjeta
       if (card != null) {
         account = card;
@@ -752,6 +757,34 @@ REGLAS IMPORTANTES:
       splitOtherAmount: splitOther,
       rawInput: input,
     );
+  }
+
+  // ─────────────────────────────────────────────
+  // Extraer título legible del input del usuario
+  // ─────────────────────────────────────────────
+  String _extractTitleFromInput(String input, double? amount) {
+    // Quitar números, signos de moneda, y palabras de acción comunes
+    String cleaned = input;
+    // Quitar montos (ej: $2.500, 2500, $ 3000)
+    cleaned = cleaned.replaceAll(RegExp(r'\$\s*[\d.,]+'), '');
+    cleaned = cleaned.replaceAll(RegExp(r'\b\d[\d.,]*\b'), '');
+    // Quitar palabras vacías / verbos de acción
+    const stopWords = [
+      'gasté', 'gaste', 'pagué', 'pague', 'compré', 'compre',
+      'en', 'de', 'con', 'por', 'el', 'la', 'los', 'las', 'un', 'una',
+      'pesos', 'ars', 'usd', 'dólares', 'dolares', 'efectivo',
+      'débito', 'debito', 'crédito', 'credito',
+    ];
+    final words = cleaned.split(RegExp(r'\s+'))
+        .where((w) => w.length > 1 && !stopWords.contains(w.toLowerCase()))
+        .toList();
+
+    if (words.isEmpty) return 'Gasto';
+
+    // Capitalizar primera palabra
+    final result = words.join(' ').trim();
+    if (result.isEmpty) return 'Gasto';
+    return result[0].toUpperCase() + result.substring(1);
   }
 
   // ─────────────────────────────────────────────

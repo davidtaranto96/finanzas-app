@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/feedback_provider.dart';
 import '../../../../core/providers/onboarding_provider.dart';
-import '../../../../core/providers/database_provider.dart';
+import '../../../../core/database/database_providers.dart';
 import '../../../../core/database/database_seeder.dart';
 import '../../../../core/services/cloud_backup_service.dart';
 
@@ -109,13 +109,10 @@ class _LoginPageState extends ConsumerState<LoginPage>
   Future<void> _checkForBackup(String uid) async {
     if (!mounted) return;
 
-    // Show loading while checking remote backup
     setState(() => _error = null);
 
     try {
       final backupService = CloudBackupService(uid: uid);
-
-      // Check if there's a backup in Firebase Storage (not just local prefs)
       final remoteDate = await backupService.remoteBackupDate();
 
       if (!mounted) return;
@@ -125,95 +122,45 @@ class _LoginPageState extends ConsumerState<LoginPage>
         return;
       }
 
-      // Backup found! Show restore dialog
+      // Backup found → auto-restore
       final dateStr = '${remoteDate.day}/${remoteDate.month}/${remoteDate.year}';
-      final shouldRestore = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1E1E2C),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF40C4FF).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.cloud_done_rounded,
-                    color: Color(0xFF40C4FF), size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Backup encontrado',
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    fontSize: 17,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            'Encontramos un backup del $dateStr en tu cuenta de Google. ¿Querés restaurar tus datos?',
-            style: GoogleFonts.inter(
-              color: Colors.white70,
-              fontSize: 14,
-              height: 1.4,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Empezar de cero',
-                  style: GoogleFonts.inter(color: Colors.white54)),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF40C4FF),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              child: Text('Restaurar datos',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-            ),
-          ],
-        ),
-      );
 
-      if (shouldRestore == true && mounted) {
-        try {
-          await backupService.downloadBackup();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Datos restaurados correctamente',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-                ),
-                backgroundColor: const Color(0xFF5ECFB1),
-                duration: const Duration(seconds: 3),
+      try {
+        // Close current DB before replacing the file
+        final db = ref.read(databaseProvider);
+        await db.close();
+
+        await backupService.downloadBackup();
+
+        // Force Drift to reopen with the restored file
+        ref.invalidate(databaseProvider);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Backup del $dateStr restaurado automáticamente',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
               ),
-            );
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Error al restaurar: $e',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-                ),
-                backgroundColor: Colors.redAccent,
-                duration: const Duration(seconds: 3),
+              backgroundColor: const Color(0xFF5ECFB1),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } catch (e) {
+        // If close/restore fails, invalidate DB anyway so a fresh one is created
+        ref.invalidate(databaseProvider);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Error al restaurar backup: $e',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
               ),
-            );
-          }
+              backgroundColor: Colors.redAccent,
+              duration: const Duration(seconds: 3),
+            ),
+          );
         }
       }
     } catch (_) {
@@ -544,7 +491,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                     const SizedBox(height: 8),
 
                     Text(
-                      'v1.4.1',
+                      'v1.5.6',
                       style: GoogleFonts.inter(
                         fontSize: 10,
                         color: Colors.white.withValues(alpha: 0.08),

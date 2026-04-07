@@ -22,6 +22,7 @@ import '../../features/goals/presentation/pages/savings_page.dart';
 import '../../features/more/presentation/pages/novedades_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/settings/presentation/pages/mercado_pago_page.dart';
+import '../../features/recurring/presentation/pages/recurring_page.dart';
 import '../shell/app_shell.dart';
 import '../providers/auth_provider.dart';
 import '../providers/onboarding_provider.dart';
@@ -158,6 +159,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsPage(),
+      ),
+      GoRoute(
+        path: '/recurring',
+        builder: (context, state) => const RecurringPage(),
       ),
     ],
   );

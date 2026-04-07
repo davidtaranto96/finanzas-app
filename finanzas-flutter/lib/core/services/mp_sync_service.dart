@@ -43,12 +43,21 @@ class MpSyncService {
   final AppDatabase db;
   final MercadoPagoService mpService;
   final int? userId;
+  final String? targetAccountId;
 
-  MpSyncService({required this.db, required this.mpService, this.userId});
+  MpSyncService({required this.db, required this.mpService, this.userId, this.targetAccountId});
 
   // ── Resolver / crear cuenta MP ────────────────────────────────────────────
 
   Future<String> resolveOrCreateMpAccount() async {
+    // 0. Si se proveyó un targetAccountId, usarlo directamente
+    if (targetAccountId != null) {
+      final target = await (db.select(db.accountsTable)
+            ..where((t) => t.id.equals(targetAccountId!)))
+          .getSingleOrNull();
+      if (target != null) return target.id;
+    }
+
     // 1. Buscar por ID exacto
     final byId = await (db.select(db.accountsTable)
           ..where((t) => t.id.equals('mp_ars')))

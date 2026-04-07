@@ -32,8 +32,10 @@ class MpMovement {
   /// 2. operation_type como fallback
   static bool _isExpenseForUser(Map<String, dynamic> json, int? userId) {
     final opType = json['operation_type'] as String? ?? '';
-    final collectorId = json['collector']?['id'] as int?;
-    final payerId = json['payer']?['id'] as int?;
+    final collectorIdRaw = json['collector']?['id'];
+    final collectorId = collectorIdRaw is int ? collectorIdRaw : (collectorIdRaw is String ? int.tryParse(collectorIdRaw) : null);
+    final payerIdRaw = json['payer']?['id'];
+    final payerId = payerIdRaw is int ? payerIdRaw : (payerIdRaw is String ? int.tryParse(payerIdRaw) : null);
 
     // Si tenemos el userId → comparar directamente
     if (userId != null) {
@@ -203,7 +205,7 @@ class MpUserProfile {
 
   factory MpUserProfile.fromJson(Map<String, dynamic> json) {
     return MpUserProfile(
-      id: json['id'] as int? ?? 0,
+      id: json['id'] is int ? json['id'] as int : (json['id'] is String ? int.tryParse(json['id'] as String) ?? 0 : 0),
       firstName: json['first_name'] as String?,
       lastName: json['last_name'] as String?,
       email: json['email'] as String?,
@@ -230,6 +232,12 @@ class MercadoPagoService {
         .get(Uri.parse('$_baseUrl/users/me'), headers: _headers)
         .timeout(const Duration(seconds: 15));
 
+    if (response.statusCode == 401) {
+      throw Exception('Token inválido o expirado. Generá uno nuevo en developers.mercadopago.com.ar');
+    }
+    if (response.statusCode == 403) {
+      throw Exception('Permiso denegado (403). Asegurate de usar un Access Token de producción con los scopes necesarios.');
+    }
     if (response.statusCode != 200) {
       throw Exception('Error al obtener perfil: HTTP ${response.statusCode}');
     }

@@ -272,6 +272,62 @@ void _drawInstallmentsSection(
   }
 }
 
+/// Generates a CSV file from transactions and returns the file path.
+Future<String> generateTransactionsCsv({
+  required List<dynamic> transactions,
+  Map<String, String>? categoryNames,
+  Map<String, String>? accountNames,
+  String? label,
+}) async {
+  final buf = StringBuffer();
+  buf.writeln('Fecha,Hora,Tipo,Categoría,Título,Monto,Cuenta,Nota');
+
+  final df = DateFormat('dd/MM/yyyy');
+  final tf = DateFormat('HH:mm');
+
+  for (final tx in transactions) {
+    final date = df.format(tx.date as DateTime);
+    final time = tf.format(tx.date as DateTime);
+    final type = switch (tx.type.toString()) {
+      _ when tx.type.toString().contains('income') => 'Ingreso',
+      _ when tx.type.toString().contains('expense') => 'Gasto',
+      _ when tx.type.toString().contains('transfer') => 'Transferencia',
+      _ when tx.type.toString().contains('loanGiven') => 'Préstamo dado',
+      _ when tx.type.toString().contains('loanReceived') => 'Préstamo recibido',
+      _ => tx.type.toString(),
+    };
+    final catId = tx.categoryId as String;
+    final category = categoryNames?[catId] ?? _cleanCatId(catId);
+    final title = _csvEscape(tx.title as String);
+    final amount = (tx.amount as double).toStringAsFixed(2);
+    final accId = tx.accountId as String;
+    final account = accountNames?[accId] ?? accId;
+    final note = _csvEscape((tx.note as String?) ?? '');
+    buf.writeln('$date,$time,$type,$category,$title,$amount,$account,$note');
+  }
+
+  Directory? dir = await getExternalStorageDirectory();
+  if (dir != null) {
+    final downloadDir = Directory('${dir.path.split('Android')[0]}Download');
+    if (await downloadDir.exists()) {
+      dir = downloadDir;
+    }
+  }
+  dir ??= await getApplicationDocumentsDirectory();
+  final fileName = 'Sencillo_${label ?? 'Movimientos'}_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv';
+  final file = File('${dir.path}/$fileName');
+  await file.writeAsBytes(buf.toString().codeUnits);
+
+  return file.path;
+}
+
+String _csvEscape(String val) {
+  if (val.contains(',') || val.contains('"') || val.contains('\n')) {
+    return '"${val.replaceAll('"', '""')}"';
+  }
+  return val;
+}
+
 /// Data class for installment info to include in PDF export.
 class InstallmentInfo {
   final String description;

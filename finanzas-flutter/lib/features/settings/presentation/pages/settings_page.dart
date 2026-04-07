@@ -12,7 +12,7 @@ import '../../../../core/database/database_seeder.dart';
 import '../../../../core/database/database_providers.dart' hide databaseProvider;
 import '../../../../core/logic/ai_transaction_parser.dart';
 import '../../../../core/logic/user_profile_service.dart';
-import '../../../../core/providers/tab_config_provider.dart';
+import '../../../../core/widgets/tab_config_sheet.dart';
 import '../../../../core/providers/alerts_provider.dart';
 import '../../../../core/providers/onboarding_provider.dart';
 import '../../../../core/providers/feedback_provider.dart';
@@ -20,6 +20,14 @@ import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../wishlist/presentation/providers/wishlist_provider.dart';
 import '../../../../core/providers/mercado_pago_provider.dart';
+import '../../../../core/logic/account_service.dart';
+import '../../../../core/providers/currency_preferences_provider.dart';
+import '../../../../core/providers/crypto_provider.dart';
+import '../../../../core/providers/stocks_provider.dart';
+import '../../../../core/providers/home_widgets_provider.dart';
+import '../../../../core/widgets/home_widget_config_sheet.dart';
+import '../../../../core/widgets/select_sheets.dart';
+import '../../../../core/utils/currency_utils.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -73,6 +81,11 @@ class SettingsPage extends ConsumerWidget {
             color: AppTheme.colorIncome,
             onTap: () {},
           ),
+          _ConversionRateTile(),
+          _CurrencySelectTile(),
+          _CryptoSelectTile(),
+          _StocksSelectTile(),
+          _HomeWidgetsTile(),
           _SettingsTile(
             icon: Icons.play_circle_outline_rounded,
             title: 'Restablecer tutorial',
@@ -138,6 +151,20 @@ class SettingsPage extends ConsumerWidget {
             options: const [3, 5, 7, 14, 30],
             suffix: ' días',
           ),
+          _SwitchTile(
+            icon: Icons.notifications_active_rounded,
+            title: 'Recordatorio diario',
+            subtitle: 'Anotá tus gastos a la noche',
+            color: const Color(0xFFF7931A),
+            provider: notifDailyReminderEnabledProvider,
+          ),
+          _SwitchTile(
+            icon: Icons.bar_chart_rounded,
+            title: 'Resumen semanal',
+            subtitle: 'Cada lunes, revisá tu semana',
+            color: const Color(0xFF0066CC),
+            provider: notifWeeklySummaryEnabledProvider,
+          ),
 
           const SizedBox(height: 24),
           _SectionTitle('Finanzas'),
@@ -155,6 +182,14 @@ class SettingsPage extends ConsumerWidget {
             color: AppTheme.colorTransfer,
             onTap: () => context.push('/accounts'),
           ),
+          _SettingsTile(
+            icon: Icons.repeat_rounded,
+            title: 'Gastos recurrentes',
+            subtitle: 'Suscripciones, alquileres, cuotas',
+            color: const Color(0xFFAB47BC),
+            onTap: () => context.push('/recurring'),
+          ),
+          _DefaultAccountTile(),
           _MercadoPagoTile(),
 
           const SizedBox(height: 24),
@@ -227,7 +262,7 @@ class SettingsPage extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 100),
+          const SizedBox(height: 120),
         ],
       ),
     );
@@ -784,287 +819,7 @@ class _ProfileField extends StatelessWidget {
 // ─────────────────────────────────────────────────────
 // Tab Config Sheet (extracted as top-level function)
 // ─────────────────────────────────────────────────────
-void showTabConfigSheet(BuildContext context, WidgetRef ref) {
-  final currentTabs = List<String>.from(ref.read(tabConfigProvider));
-
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setLocal) {
-        final allDisabled =
-            kAllTabs.where((t) => !currentTabs.contains(t)).toList();
-
-        return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.82,
-          ),
-          padding: const EdgeInsets.fromLTRB(0, 24, 0, 24),
-          decoration: const BoxDecoration(
-            color: Color(0xFF18181F),
-            borderRadius:
-                BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                  child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.circular(2)))),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text('Personalizar navegación',
-                          style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white)),
-                    ),
-                    FilledButton(
-                      onPressed: () {
-                        ref
-                            .read(tabConfigProvider.notifier)
-                            .setOrder(currentTabs);
-                        Navigator.pop(ctx);
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppTheme.colorTransfer,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        minimumSize: Size.zero,
-                      ),
-                      child: const Text('Guardar',
-                          style: TextStyle(fontSize: 13)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                    'Mantené presionado y arrastrá para reordenar · Máximo $kMaxVisibleTabs',
-                    style: GoogleFonts.inter(
-                        fontSize: 12, color: Colors.white38)),
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('ACTIVAS  (${currentTabs.length})',
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white38,
-                          letterSpacing: 1)),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: EdgeInsets.zero,
-                  children: [
-                    ReorderableListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: currentTabs.length,
-                      onReorder: (oldIndex, newIndex) {
-                        setLocal(() {
-                          if (newIndex > oldIndex) newIndex--;
-                          final item = currentTabs.removeAt(oldIndex);
-                          currentTabs.insert(newIndex, item);
-                        });
-                      },
-                      proxyDecorator: (child, index, animation) =>
-                          Material(
-                        color: Colors.transparent,
-                        elevation: 4,
-                        shadowColor: AppTheme.colorTransfer
-                            .withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(14),
-                        child: child,
-                      ),
-                      itemBuilder: (ctx, index) {
-                        final tabId = currentTabs[index];
-                        final info = kTabInfo[tabId]!;
-                        final locked =
-                            kAlwaysVisibleTabs.contains(tabId);
-                        return Container(
-                          key: ValueKey(tabId),
-                          margin:
-                              const EdgeInsets.symmetric(vertical: 4),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E2C),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                                color: AppTheme.colorTransfer
-                                    .withValues(alpha: 0.15)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.drag_handle_rounded,
-                                  size: 20, color: Colors.white38),
-                              const SizedBox(width: 12),
-                              Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.colorTransfer
-                                      .withValues(alpha: 0.12),
-                                  borderRadius:
-                                      BorderRadius.circular(8),
-                                ),
-                                child: Icon(info.icon,
-                                    size: 16,
-                                    color: AppTheme.colorTransfer),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(info.label,
-                                    style: GoogleFonts.inter(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.white)),
-                              ),
-                              if (locked)
-                                Icon(Icons.lock_rounded,
-                                    size: 14,
-                                    color: Colors.white
-                                        .withValues(alpha: 0.15))
-                              else
-                                GestureDetector(
-                                  onTap: () {
-                                    if (currentTabs.length <= 3) return;
-                                    setLocal(() {
-                                      currentTabs.removeAt(index);
-                                    });
-                                  },
-                                  child: Icon(
-                                      Icons
-                                          .remove_circle_outline_rounded,
-                                      size: 20,
-                                      color: currentTabs.length <= 3
-                                          ? Colors.white12
-                                          : AppTheme.colorExpense
-                                              .withValues(alpha: 0.7)),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    if (allDisabled.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 24),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                              'DISPONIBLES  (${allDisabled.length})',
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white38,
-                                  letterSpacing: 1)),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ...allDisabled.map((tabId) {
-                        final info = kTabInfo[tabId]!;
-                        final canAdd =
-                            currentTabs.length < kMaxVisibleTabs;
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 4),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color:
-                                  Colors.white.withValues(alpha: 0.03),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Row(
-                              children: [
-                                const SizedBox(width: 32),
-                                Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white
-                                        .withValues(alpha: 0.05),
-                                    borderRadius:
-                                        BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(info.icon,
-                                      size: 16,
-                                      color: Colors.white38),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(info.label,
-                                      style: GoogleFonts.inter(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.white54)),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    if (!canAdd) return;
-                                    setLocal(() {
-                                      final moreIdx = currentTabs
-                                          .indexOf('more');
-                                      if (moreIdx >= 0 &&
-                                          moreIdx ==
-                                              currentTabs.length - 1) {
-                                        currentTabs.insert(
-                                            moreIdx, tabId);
-                                      } else {
-                                        currentTabs.add(tabId);
-                                      }
-                                    });
-                                  },
-                                  child: Icon(
-                                      Icons
-                                          .add_circle_outline_rounded,
-                                      size: 20,
-                                      color: canAdd
-                                          ? AppTheme.colorIncome
-                                              .withValues(alpha: 0.7)
-                                          : Colors.white12),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    ),
-  );
-}
+// showTabConfigSheet() moved to lib/core/widgets/tab_config_sheet.dart
 
 // ─────────────────────────────────────────────────────
 // Reminder Days Tile
@@ -1281,6 +1036,158 @@ class _ApiKeyTileState extends State<_ApiKeyTile> {
       color: _hasKey ? AppTheme.colorIncome : AppTheme.colorTransfer,
       highlight: _hasKey,
       onTap: _showKeyDialog,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// Currency Select Tile
+// ─────────────────────────────────────────────────────
+class _CurrencySelectTile extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(selectedCurrenciesProvider);
+
+    return _SettingsTile(
+      icon: Icons.currency_exchange_rounded,
+      title: 'Cotizaciones',
+      subtitle: '${selected.length} de ${kAllCurrencies.length} visibles',
+      color: const Color(0xFF6C63FF),
+      onTap: () => showCurrencySelectSheet(context, ref),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// Crypto Select Tile
+// ─────────────────────────────────────────────────────
+class _CryptoSelectTile extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(selectedCryptosProvider);
+
+    return _SettingsTile(
+      icon: Icons.currency_bitcoin_rounded,
+      title: 'Criptomonedas',
+      subtitle: '${selected.length} de ${kAvailableCryptos.length} visibles',
+      color: const Color(0xFFF7931A),
+      onTap: () => showCryptoSelectSheet(context, ref),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// Stocks Select Tile
+// ─────────────────────────────────────────────────────
+class _StocksSelectTile extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(selectedStocksProvider);
+
+    return _SettingsTile(
+      icon: Icons.show_chart_rounded,
+      title: 'Acciones',
+      subtitle: '${selected.length} de ${kAvailableStocks.length} visibles',
+      color: const Color(0xFF0066CC),
+      onTap: () => showStocksSelectSheet(context, ref),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// Home Widgets Tile
+// ─────────────────────────────────────────────────────
+class _HomeWidgetsTile extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(homeWidgetConfigProvider);
+    final visible = config.visibleWidgets.length;
+
+    return _SettingsTile(
+      icon: Icons.dashboard_customize_rounded,
+      title: 'Widgets de inicio',
+      subtitle: '$visible de ${kHomeWidgets.length} visibles · Reordenables',
+      color: AppTheme.colorTransfer,
+      onTap: () => showHomeWidgetConfigSheet(context, ref),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// Default Account Tile
+// ─────────────────────────────────────────────────────
+class _DefaultAccountTile extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final accountsAsync = ref.watch(accountsStreamProvider);
+    final accounts = accountsAsync.valueOrNull ?? [];
+    final current = accounts.where((a) => a.isDefault).firstOrNull;
+
+    return _SettingsTile(
+      icon: Icons.wallet_rounded,
+      title: 'Cuenta por defecto',
+      subtitle: current?.name ?? 'Sin asignar',
+      color: const Color(0xFF4ECDC4),
+      onTap: () async {
+        if (accounts.isEmpty) return;
+        final selected = await showModalBottomSheet<String>(
+          context: context,
+          backgroundColor: const Color(0xFF18181F),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          builder: (ctx) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white12,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Elegí tu cuenta por defecto',
+                    style: GoogleFonts.inter(
+                      fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Se usará al cargar movimientos nuevos',
+                    style: GoogleFonts.inter(fontSize: 12, color: Colors.white38),
+                  ),
+                  const SizedBox(height: 16),
+                  ...accounts.map((a) => ListTile(
+                    leading: Icon(
+                      a.isCreditCard ? Icons.credit_card_rounded : Icons.account_balance_wallet_rounded,
+                      color: a.isDefault ? const Color(0xFF4ECDC4) : Colors.white38,
+                    ),
+                    title: Text(a.name, style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: a.isDefault ? FontWeight.w700 : FontWeight.w400,
+                    )),
+                    subtitle: Text(
+                      a.isCreditCard ? 'Tarjeta de crédito' : formatAmount(a.balance),
+                      style: const TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                    trailing: a.isDefault
+                        ? const Icon(Icons.check_circle_rounded, color: Color(0xFF4ECDC4), size: 20)
+                        : null,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    onTap: () => Navigator.pop(ctx, a.id),
+                  )),
+                ],
+              ),
+            );
+          },
+        );
+        if (selected != null) {
+          await ref.read(accountServiceProvider).setDefaultAccount(selected);
+        }
+      },
     );
   }
 }
@@ -1610,6 +1517,83 @@ class _NotifDaysSelector extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ConversionRateTile extends ConsumerWidget {
+  const _ConversionRateTile();
+
+  static const _rateLabels = {
+    'blue': 'Dólar Blue',
+    'oficial': 'Dólar Oficial',
+    'mep': 'Dólar MEP',
+    'ccl': 'Dólar CCL',
+    'tarjeta': 'Dólar Tarjeta',
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(preferredConversionRateProvider);
+    final label = _rateLabels[current] ?? current;
+
+    return _SettingsTile(
+      icon: Icons.currency_exchange_rounded,
+      title: 'Cotización para conversión',
+      subtitle: label,
+      color: const Color(0xFF00BCD4),
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: const Color(0xFF1E1E2C),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          builder: (ctx) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(width: 40, height: 4, decoration: BoxDecoration(
+                    color: Colors.white24, borderRadius: BorderRadius.circular(2),
+                  )),
+                  const SizedBox(height: 16),
+                  Text('Cotización para conversión', style: GoogleFonts.inter(
+                    fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white,
+                  )),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Se usa para convertir cuentas en USD al balance total',
+                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  ..._rateLabels.entries.map((e) {
+                    final isSel = current == e.key;
+                    return ListTile(
+                      title: Text(e.value, style: TextStyle(
+                        color: isSel ? const Color(0xFF00BCD4) : Colors.white,
+                        fontWeight: isSel ? FontWeight.w700 : FontWeight.w400,
+                        fontSize: 14,
+                      )),
+                      trailing: isSel
+                          ? const Icon(Icons.check_rounded, color: Color(0xFF00BCD4), size: 20)
+                          : null,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      tileColor: isSel ? const Color(0xFF00BCD4).withValues(alpha: 0.08) : null,
+                      onTap: () {
+                        ref.read(preferredConversionRateProvider.notifier).set(e.key);
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

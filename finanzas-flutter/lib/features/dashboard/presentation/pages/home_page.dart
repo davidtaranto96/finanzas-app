@@ -16,11 +16,20 @@ import '../widgets/accounts_row.dart';
 import '../widgets/recent_transactions_list.dart';
 import '../widgets/currency_rates_card.dart';
 import '../widgets/mp_home_card.dart';
+import '../widgets/daily_spending_card.dart';
+import '../widgets/crypto_prices_card.dart';
+import '../widgets/stocks_card.dart';
 export '../widgets/currency_rates_card.dart' show currencyAutoRefreshProvider;
 // AddTransactionFab moved to AppShell as MorphingFab
 import '../../../transactions/domain/models/transaction.dart' as dom_tx;
 import '../../../../core/providers/account_order_provider.dart';
+import '../../../accounts/domain/models/account.dart';
 import '../../../../core/providers/alerts_provider.dart';
+import '../../../../core/providers/home_widgets_provider.dart';
+import '../../../../core/widgets/home_widget_config_sheet.dart';
+import '../../../../core/widgets/select_sheets.dart';
+import '../../../../core/providers/currency_provider.dart';
+import '../../../../core/utils/currency_utils.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -48,6 +57,154 @@ class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClie
       return ai.compareTo(bi);
     });
     return sorted;
+  }
+
+  List<Widget> _buildHomeWidgets({
+    required BuildContext context,
+    required WidgetRef ref,
+    required MonthlyBalance monthlyStats,
+    required double safeBudget,
+    required double arsCash,
+    required double pendingCards,
+    required double totalSavedInGoals,
+    required List<dom_tx.Transaction> transactions,
+    required List<Account> accounts,
+    required double pendingToRecover,
+    dynamic userProfile,
+  }) {
+    final config = ref.watch(homeWidgetConfigProvider);
+    final visible = config.visibleWidgets;
+
+    const gap = SizedBox(height: 14);
+
+    final widgetMap = <String, List<Widget>>{
+      'balance': [
+        const SizedBox(height: 6),
+        BalanceHeroCard(
+          balance: monthlyStats,
+          safeBudget: safeBudget,
+          arsCash: arsCash,
+          pendingCards: pendingCards,
+          totalSavedInGoals: totalSavedInGoals,
+          onSavingsTap: () => context.push('/savings'),
+          onIncomeTap: () {
+            ref.read(txFilterProvider.notifier).state = TxFilterType.income;
+            ref.read(navigateToTabProvider.notifier).state = 'transactions';
+          },
+          onExpenseTap: () {
+            ref.read(txFilterProvider.notifier).state = TxFilterType.expense;
+            ref.read(navigateToTabProvider.notifier).state = 'transactions';
+          },
+        ),
+        if (userProfile?.payDay != null)
+          ...[const SizedBox(height: 10), _PaydayCountdown(profile: userProfile!)],
+      ],
+      'spending': [
+        gap,
+        DailySpendingCard(transactions: transactions),
+      ],
+      'currency': [
+        gap,
+        const CurrencyRatesCard(),
+      ],
+      'crypto': [
+        gap,
+        const CryptoPricesCard(),
+      ],
+      'stocks': [
+        gap,
+        const StocksCard(),
+      ],
+      'alerts': [
+        gap,
+        const _AlertsSection(),
+      ],
+      'debts': [
+        if (pendingToRecover > 0) ...[
+          gap,
+          GestureDetector(
+            onTap: () {
+              ref.read(navigateToTabProvider.notifier).state = 'people';
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.colorWarning.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.colorWarning.withValues(alpha: 0.15)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.people_outline_rounded, color: AppTheme.colorWarning, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Te deben ${formatAmount(pendingToRecover)}',
+                      style: GoogleFonts.inter(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 18),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+      'accounts': [
+        const SizedBox(height: 18),
+        _SectionHeader(
+          title: 'Mis cuentas',
+          actionLabel: 'Ver todas',
+          onAction: () => context.push('/accounts'),
+        ),
+        const SizedBox(height: 8),
+        AccountsRow(accounts: _sortByCustomOrder(accounts, ref.watch(accountOrderProvider))),
+      ],
+      'mp': [
+        gap,
+        const MpHomeCard(),
+      ],
+      'transactions': [
+        const SizedBox(height: 18),
+        _SectionHeader(
+          title: 'Últimos movimientos',
+          actionLabel: 'Ver todos',
+          onAction: () {
+            ref.read(navigateToTabProvider.notifier).state = 'transactions';
+          },
+        ),
+        const SizedBox(height: 8),
+        _CollapsibleTransactions(transactions: transactions),
+        const SizedBox(height: 120),
+      ],
+    };
+
+    // Long-press actions for configurable widgets
+    final longPressActions = <String, VoidCallback>{
+      'currency': () => showCurrencySelectSheet(context, ref),
+      'crypto': () => showCryptoSelectSheet(context, ref),
+      'stocks': () => showStocksSelectSheet(context, ref),
+    };
+
+    final result = <Widget>[];
+    for (final id in visible) {
+      final widgets = widgetMap[id];
+      if (widgets == null) continue;
+      final onLongPress = longPressActions[id];
+      if (onLongPress != null) {
+        // Wrap configurable widgets with long-press to open their selector
+        result.addAll(widgets.map((w) => w is SizedBox
+            ? w
+            : GestureDetector(onLongPress: onLongPress, child: w)));
+      } else {
+        result.addAll(widgets);
+      }
+    }
+    return result;
   }
 
   @override
@@ -139,11 +296,26 @@ class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClie
             final arsCash = accounts.where((a) => a.currencyCode == 'ARS' && !a.isCreditCard)
                                    .fold(0.0, (sum, a) => sum + a.balance);
 
+            // Convert non-ARS accounts to ARS equivalent
+            final rates = ref.watch(currencyRatesProvider).valueOrNull ?? [];
+            final prefRate = ref.watch(preferredConversionRateProvider);
+            final foreignCashArs = accounts
+                .where((a) => a.currencyCode != 'ARS' && !a.isCreditCard && a.balance != 0)
+                .fold(0.0, (sum, a) {
+              final converted = convertToArs(
+                amount: a.balance,
+                fromCurrency: a.currencyCode,
+                rates: rates,
+                preferredRate: prefRate,
+              );
+              return sum + (converted ?? 0);
+            });
+
             // Pending credit card statements = real debt to discount from cash
             final pendingCards = accounts
                 .where((a) => a.isCreditCard)
                 .fold(0.0, (sum, a) => sum + a.pendingStatementAmount);
-            final safeBudget = arsCash - pendingCards;
+            final safeBudget = arsCash + foreignCashArs - pendingCards;
             
             // Calculate real MonthlyBalance for widgets
             final now = DateTime.now();
@@ -181,7 +353,9 @@ class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClie
                       await Future.delayed(const Duration(milliseconds: 600));
                     },
                     child: CustomScrollView(
-                    physics: const BouncingScrollPhysics(),
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
                     slivers: [
                       SliverAppBar(
                         floating: true,
@@ -219,6 +393,10 @@ class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClie
                             onTap: () => _NotificationsBottomSheet.show(context, ref),
                           ),
                           IconButton(
+                            icon: const Icon(Icons.dashboard_customize_outlined, size: 22),
+                            onPressed: () => showHomeWidgetConfigSheet(context, ref),
+                          ),
+                          IconButton(
                             icon: const Icon(Icons.settings_outlined, size: 22),
                             onPressed: () => context.push('/settings'),
                           ),
@@ -229,91 +407,21 @@ class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClie
                       SliverPadding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         sliver: SliverList(
-                          delegate: SliverChildListDelegate([
-                            const SizedBox(height: 8),
-                            BalanceHeroCard(
-                              balance: monthlyStats,
+                          delegate: SliverChildListDelegate(
+                            _buildHomeWidgets(
+                              context: context,
+                              ref: ref,
+                              monthlyStats: monthlyStats,
                               safeBudget: safeBudget,
                               arsCash: arsCash,
                               pendingCards: pendingCards,
                               totalSavedInGoals: totalSavedInGoals,
-                              onSavingsTap: () => context.push('/savings'),
-                              onIncomeTap: () {
-                                ref.read(txFilterProvider.notifier).state = TxFilterType.income;
-                                ref.read(navigateToTabProvider.notifier).state = 'transactions';
-                              },
-                              onExpenseTap: () {
-                                ref.read(txFilterProvider.notifier).state = TxFilterType.expense;
-                                ref.read(navigateToTabProvider.notifier).state = 'transactions';
-                              },
+                              transactions: transactions,
+                              accounts: accounts,
+                              pendingToRecover: pendingToRecover,
+                              userProfile: userProfile,
                             ),
-                            const SizedBox(height: 12),
-                            if (userProfile?.payDay != null)
-                              _PaydayCountdown(profile: userProfile!),
-                            const SizedBox(height: 12),
-                            const CurrencyRatesCard(),
-                            const SizedBox(height: 12),
-                            const _AlertsSection(),
-                            
-                            // Quick stats strip
-                            if (pendingToRecover > 0) ...[
-                              const SizedBox(height: 12),
-                              GestureDetector(
-                                onTap: () {
-                                  ref.read(navigateToTabProvider.notifier).state = 'people';
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.colorWarning.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: AppTheme.colorWarning.withValues(alpha: 0.15)),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.people_outline_rounded, color: AppTheme.colorWarning, size: 18),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          'Te deben ${formatAmount(pendingToRecover)}',
-                                          style: GoogleFonts.inter(
-                                            color: Colors.white70,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                      Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 18),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-
-                            const SizedBox(height: 20),
-
-                            _SectionHeader(
-                              title: 'Mis cuentas',
-                              actionLabel: 'Ver todas',
-                              onAction: () => context.push('/accounts'),
-                            ),
-                            const SizedBox(height: 8),
-                            AccountsRow(accounts: _sortByCustomOrder(accounts, ref.watch(accountOrderProvider))),
-                            const SizedBox(height: 16),
-                            const MpHomeCard(),
-                            const SizedBox(height: 20),
-
-                            _SectionHeader(
-                              title: 'Últimos movimientos',
-                              actionLabel: 'Ver todos',
-                              onAction: () {
-                                ref.read(navigateToTabProvider.notifier).state = 'transactions';
-                              },
-                            ),
-                            const SizedBox(height: 8),
-                            RecentTransactionsList(transactions: transactions.take(10).toList()),
-                            const SizedBox(height: 100),
-                          ]),
+                          ),
                         ),
                       ),
                     ],
@@ -904,6 +1012,67 @@ class _SmartAlertBanner extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CollapsibleTransactions extends StatefulWidget {
+  final List<dom_tx.Transaction> transactions;
+  const _CollapsibleTransactions({required this.transactions});
+
+  @override
+  State<_CollapsibleTransactions> createState() => _CollapsibleTransactionsState();
+}
+
+class _CollapsibleTransactionsState extends State<_CollapsibleTransactions> {
+  static const _initialCount = 4;
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final all = widget.transactions;
+    final showExpand = all.length > _initialCount;
+    final visible = _expanded ? all.take(12).toList() : all.take(_initialCount).toList();
+
+    return Column(
+      children: [
+        RecentTransactionsList(transactions: visible),
+        if (showExpand)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: GestureDetector(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _expanded ? 'Ver menos' : 'Ver más movimientos',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.colorTransfer,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: AppTheme.colorTransfer,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

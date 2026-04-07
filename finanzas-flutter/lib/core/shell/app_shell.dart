@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/database/database_providers.dart';
 import '../../core/providers/shell_providers.dart';
 import '../../core/providers/tab_config_provider.dart';
+import '../../core/widgets/tab_config_sheet.dart';
 import '../../core/providers/feedback_provider.dart';
 import '../../core/providers/mercado_pago_provider.dart';
 import '../../core/providers/friend_requests_provider.dart';
@@ -27,7 +28,10 @@ import '../../features/reports/presentation/pages/reports_page.dart';
 import '../../features/accounts/presentation/pages/accounts_page.dart';
 import '../../features/goals/presentation/pages/savings_page.dart';
 import '../services/notification_service.dart';
+import '../logic/recurring_service.dart';
 import '../widgets/app_fab.dart';
+import '../logic/transaction_service.dart';
+import '../widgets/success_overlay.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -67,6 +71,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     // Schedule notifications on app start + check for in-app alerts + MP auto-sync
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationServiceProvider).refreshAll(ref);
+      ref.read(recurringServiceProvider).processRecurrings();
       _checkInAppAlerts();
       _tryAutoSyncMercadoPago();
     });
@@ -268,12 +273,39 @@ class _AppShellState extends ConsumerState<AppShell> {
     IconData? fabIcon;
     VoidCallback? fabAction;
     VoidCallback? fabLongPress;
+    VoidCallback? fabDoubleTap;
 
     switch (currentTabId) {
       case 'home':
         fabIcon = Icons.auto_awesome_rounded;
         fabAction = () => AddTransactionBottomSheet.show(context);
         fabLongPress = () => AddTransactionBottomSheet.show(context, startWithVoice: true);
+        fabDoubleTap = () async {
+          final txs = ref.read(transactionsStreamProvider).valueOrNull;
+          final lastTx = txs != null && txs.isNotEmpty ? txs.first : null;
+          if (lastTx == null) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('No hay movimientos para duplicar')),
+              );
+            }
+            return;
+          }
+          appHaptic(ref, type: HapticType.medium);
+          await ref.read(transactionServiceProvider).duplicateTransaction(lastTx.id);
+          appSound(ref, type: SoundType.success);
+          if (context.mounted) {
+            await SuccessOverlay.show(context);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('"${lastTx.title}" duplicado'),
+                  backgroundColor: AppTheme.colorTransfer.withValues(alpha: 0.85),
+                ),
+              );
+            }
+          }
+        };
       case 'transactions':
         if (!txSearchActive) {
           fabIcon = Icons.search_rounded;
@@ -360,6 +392,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                     icon: fabIcon ?? Icons.add_rounded,
                     onPressed: fabAction ?? () {},
                     onLongPress: fabLongPress,
+                    onDoubleTap: fabDoubleTap,
                   ),
                 ),
               ),
@@ -407,6 +440,12 @@ class _AppShellState extends ConsumerState<AppShell> {
             currentIndex: _currentPage,
             tabs: visibleTabs,
             onTap: _onTap,
+            pageController: _pageController,
+            onLongPress: () {
+              appHaptic(ref, type: HapticType.medium);
+              appSound(ref, type: SoundType.tap);
+              showTabConfigSheet(context, ref);
+            },
           ),
         ),
       ),
@@ -528,18 +567,21 @@ class _FloatingNavBar extends StatelessWidget {
   final int currentIndex;
   final List<_TabItem> tabs;
   final ValueChanged<int> onTap;
+  final VoidCallback? onLongPress;
+  final PageController? pageController;
   const _FloatingNavBar(
-      {required this.currentIndex, required this.tabs, required this.onTap});
+      {required this.currentIndex, required this.tabs, required this.onTap, this.onLongPress, this.pageController});
 
   @override
   Widget build(BuildContext context) {
     final showLabels = tabs.length < 6;
+    final barHeight = showLabels ? 70.0 : 60.0;
     return ClipRRect(
       borderRadius: BorderRadius.circular(40),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
         child: Container(
-          height: showLabels ? 70 : 60,
+          height: barHeight,
           decoration: BoxDecoration(
             color: const Color(0xFF18181F).withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(40),
@@ -552,18 +594,60 @@ class _FloatingNavBar extends StatelessWidget {
                   offset: const Offset(0, 10)),
             ],
           ),
-          child: Row(
-            children: tabs
-                .asMap()
-                .entries
-                .map((e) => Expanded(
-                      child: _NavItem(
-                          tab: e.value,
-                          selected: e.key == currentIndex,
-                          showLabel: showLabels,
-                          onTap: () => onTap(e.key)),
-                    ))
-                .toList(),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final totalWidth = constraints.maxWidth;
+              final tabWidth = tabs.isNotEmpty ? totalWidth / tabs.length : 0.0;
+              const indicatorW = 16.0;
+
+              return Stack(
+                children: [
+                  Row(
+                    children: tabs
+                        .asMap()
+                        .entries
+                        .map((e) => Expanded(
+                              child: _NavItem(
+                                  tab: e.value,
+                                  selected: e.key == currentIndex,
+                                  showLabel: showLabels,
+                                  onTap: () => onTap(e.key),
+                                  onLongPress: onLongPress),
+                            ))
+                        .toList(),
+                  ),
+                  // Sliding indicator
+                  if (tabs.isNotEmpty)
+                    AnimatedBuilder(
+                      animation: pageController ?? const AlwaysStoppedAnimation(0),
+                      builder: (context, _) {
+                        final page = (pageController?.hasClients ?? false)
+                            ? (pageController!.page ?? currentIndex.toDouble())
+                            : currentIndex.toDouble();
+                        final left = page * tabWidth + (tabWidth - indicatorW) / 2;
+                        return Positioned(
+                          left: left,
+                          bottom: showLabels ? 6 : 5,
+                          child: Container(
+                            width: indicatorW,
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color: AppTheme.colorTransfer,
+                              borderRadius: BorderRadius.circular(1.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppTheme.colorTransfer.withValues(alpha: 0.5),
+                                  blurRadius: 8,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -579,17 +663,20 @@ class _NavItem extends StatefulWidget {
   final bool selected;
   final bool showLabel;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   const _NavItem(
-      {required this.tab, required this.selected, this.showLabel = true, required this.onTap});
+      {required this.tab, required this.selected, this.showLabel = true, required this.onTap, this.onLongPress});
 
   @override
   State<_NavItem> createState() => _NavItemState();
 }
 
 class _NavItemState extends State<_NavItem>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scale;
+  late AnimationController _bounceCtrl;
+  late Animation<double> _bounceScale;
 
   @override
   void initState() {
@@ -600,11 +687,21 @@ class _NavItemState extends State<_NavItem>
       reverseDuration: const Duration(milliseconds: 200),
     );
     _scale = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+
+    _bounceCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+      reverseDuration: const Duration(milliseconds: 250),
+    );
+    _bounceScale = Tween<double>(begin: 1.0, end: 0.82).animate(
+      CurvedAnimation(parent: _bounceCtrl, curve: Curves.easeInOutCubicEmphasized),
+    );
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _bounceCtrl.dispose();
     super.dispose();
   }
 
@@ -616,6 +713,11 @@ class _NavItemState extends State<_NavItem>
 
   void _onTapCancel() => _controller.reverse();
 
+  void _onLongPress() {
+    _bounceCtrl.forward().then((_) => _bounceCtrl.reverse());
+    widget.onLongPress?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isSelected = widget.selected;
@@ -623,8 +725,15 @@ class _NavItemState extends State<_NavItem>
       onTapDown: _onTapDown,
       onTapUp: _onTapUp,
       onTapCancel: _onTapCancel,
+      onLongPress: _onLongPress,
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
+      child: AnimatedBuilder(
+        animation: _bounceScale,
+        builder: (context, child) => Transform.scale(
+          scale: _bounceScale.value,
+          child: child,
+        ),
+        child: SizedBox(
         height: widget.showLabel ? 70 : 60,
         child: Stack(
           alignment: Alignment.center,
@@ -710,32 +819,14 @@ class _NavItemState extends State<_NavItem>
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
-                const SizedBox(height: 4),
-                // Active indicator bar with glow
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOutCubic,
-                  width: isSelected ? 16 : 0,
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppTheme.colorTransfer
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(1.5),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                                color: AppTheme.colorTransfer
-                                    .withValues(alpha: 0.5),
-                                blurRadius: 8)
-                          ]
-                        : [],
-                  ),
+                // Spacer for indicator area (indicator is rendered in _FloatingNavBar)
+                const SizedBox(height: 7,
                 ),
               ],
             ),
           ],
         ),
+      ),
       ),
     );
   }

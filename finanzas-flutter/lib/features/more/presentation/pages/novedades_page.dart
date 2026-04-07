@@ -25,11 +25,69 @@ class NovedadesPage extends StatelessWidget {
           _CurrentVersionBanner(),
           const SizedBox(height: 20),
 
+          // v1.5.8
+          _VersionCard(
+            version: 'v1.5.8',
+            date: '7 Abr 2026',
+            isCurrent: true,
+            items: const [
+              _ChangeItem(icon: Icons.check_circle_rounded, text: 'Animación de éxito al registrar movimientos: checkmark verde animado', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.touch_app_rounded, text: 'Double-tap en FAB: duplica el último movimiento al instante', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.linear_scale_rounded, text: 'Indicador de navegación deslizante: sigue el swipe entre tabs', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.swipe_rounded, text: 'Swipe bidireccional en movimientos: derecha para editar, izquierda para eliminar', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.warning_amber_rounded, text: 'Alertas de presupuesto: notificación push + in-app cuando excedés un presupuesto', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.table_chart_rounded, text: 'Exportar CSV: descargá tus movimientos en planilla desde Análisis', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.calendar_view_week_rounded, text: 'Análisis semanal: nuevo filtro "Semana" en reportes', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.notifications_active_rounded, text: 'Recordatorio diario y resumen semanal: notificaciones configurables desde Ajustes', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.repeat_rounded, text: 'Gastos recurrentes: suscripciones, alquileres y cuotas se registran automáticamente', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.currency_exchange_rounded, text: 'Multi-moneda: cuentas en USD/EUR se convierten al balance total usando cotización preferida', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.link_rounded, text: 'Vincular Mercado Pago a cuenta existente: elegí dónde importar movimientos', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.science_rounded, text: 'Tests unitarios: 25 tests para servicios core (transacciones, presupuestos, recurrentes, moneda)', type: _ChangeType.improvement),
+            ],
+          ),
+
+          // v1.5.7
+          _VersionCard(
+            version: 'v1.5.7',
+            date: '7 Abr 2026',
+            isCurrent: false,
+            items: const [
+              _ChangeItem(icon: Icons.currency_bitcoin_rounded, text: 'Widget de criptomonedas en Home: precios en tiempo real de Bitcoin, Ethereum, Solana y más', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.show_chart_rounded, text: 'Widget de acciones en Home: Merval, CEDEARs y acciones argentinas con variación diaria', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.dashboard_customize_rounded, text: 'Personalizar Home: reordená y ocultá widgets desde el botón ⊞ o desde Ajustes', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.touch_app_rounded, text: 'Long-press en la barra de navegación: abre personalización de tabs con efecto bounce', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.tune_rounded, text: 'Nuevos selectores en Ajustes: elegí qué cryptos, acciones y widgets ver en Home', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.sync_rounded, text: 'Fix: sincronización Mercado Pago arreglada (error de tipo String/int)', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.vpn_key_rounded, text: 'Fix: mejor mensaje de error al conectar token de Mercado Pago (401/403)', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.price_check_rounded, text: 'Fix: check de precio MeLi mejorado con mejor detección de URL y mensajes claros', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.view_module_rounded, text: 'Fix: selector de cotizaciones ya no se desborda con muchas opciones', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.auto_awesome_rounded, text: 'Polish: bottom sheet de movimientos con tipografía más grande, mejor spacing y controles más amplios', type: _ChangeType.improvement),
+            ],
+          ),
+
+          // v1.5.6
+          _VersionCard(
+            version: 'v1.5.6',
+            date: '7 Abr 2026',
+            isCurrent: false,
+            items: const [
+              _ChangeItem(icon: Icons.smart_toy_rounded, text: 'Fix: la IA ahora usa el título real del gasto en vez de mostrar "Gasto" genérico', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.account_balance_wallet_rounded, text: 'Recomendación inteligente de cuenta: muestra saldo disponible y límite de tarjeta al elegir cuenta', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.wallet_rounded, text: 'Nueva opción "Cuenta por defecto" en Ajustes → Finanzas', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.currency_exchange_rounded, text: 'Cotizaciones personalizables: elegí qué dólares ver desde Ajustes', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.trending_down_rounded, text: 'Seguimiento de precios en Antojos: registrá precios y recibí aviso cuando bajan', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.store_rounded, text: 'Auto-check de precios MercadoLibre: si el item tiene URL de MeLi, se consulta el precio actual automáticamente', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.add_rounded, text: 'Fix: botón FAB ahora aparece al abrir Antojos desde el menú Más', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.calendar_today_rounded, text: 'Nuevo widget "Gastos" en Home: mirá cuánto gastaste hoy, esta semana o este mes con desglose por categorías', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.cloud_download_rounded, text: 'Fix: al loguearte con Google, se restaura automáticamente tu último backup sin preguntar', type: _ChangeType.fix),
+            ],
+          ),
+
           // v1.5.5
           _VersionCard(
             version: 'v1.5.5',
             date: '6 Abr 2026',
-            isCurrent: true,
+            isCurrent: false,
             items: const [
               _ChangeItem(icon: Icons.people_alt_rounded, text: '"Personas" ahora se llama Amigos, "Objetivos" → Metas, "Wishlist" → Antojos, "Reportes" → Análisis', type: _ChangeType.improvement),
               _ChangeItem(icon: Icons.notifications_rounded, text: 'Badge rojo en la nav bar cuando hay solicitudes de amistad pendientes o alertas sin leer', type: _ChangeType.feature),
@@ -564,7 +622,7 @@ class _CurrentVersionBanner extends StatelessWidget {
                         border: Border.all(color: AppTheme.colorTransfer.withValues(alpha: 0.35)),
                       ),
                       child: Text(
-                        'v1.5.5',
+                        'v1.5.7',
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,

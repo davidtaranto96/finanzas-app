@@ -53,7 +53,7 @@ Color _catColor(String id) =>
     _categoryColors[id] ?? AppTheme.colorTransfer;
 
 // ─── Date range mode ───
-enum _RangeMode { month, custom }
+enum _RangeMode { week, month, custom }
 
 class ReportsPage extends ConsumerStatefulWidget {
   const ReportsPage({super.key});
@@ -132,6 +132,15 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     }
   }
 
+  DateTimeRange get _weekRange {
+    final now = DateTime.now();
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    return DateTimeRange(
+      start: DateTime(weekStart.year, weekStart.month, weekStart.day),
+      end: DateTime(weekStart.year, weekStart.month, weekStart.day + 6),
+    );
+  }
+
   /// Filter transactions by active date range
   List<Transaction> _filterByRange(List<Transaction> txs) {
     if (_rangeMode == _RangeMode.month) {
@@ -141,14 +150,16 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
               t.date.month == _selectedMonth.month)
           .toList();
     }
+    final range = _rangeMode == _RangeMode.week ? _weekRange : _customRange;
     return txs
         .where((t) =>
-            !t.date.isBefore(_customRange.start) &&
-            t.date.isBefore(_customRange.end.add(const Duration(days: 1))))
+            !t.date.isBefore(range.start) &&
+            t.date.isBefore(range.end.add(const Duration(days: 1))))
         .toList();
   }
 
   String get _rangeLabel {
+    if (_rangeMode == _RangeMode.week) return 'Esta semana';
     if (_rangeMode == _RangeMode.month) {
       final name =
           DateFormat('MMMM yyyy', 'es').format(_selectedMonth);
@@ -159,6 +170,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   }
 
   int get _rangeDays {
+    if (_rangeMode == _RangeMode.week) return 7;
     if (_rangeMode == _RangeMode.month) {
       return DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
     }
@@ -261,9 +273,9 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.picture_as_pdf_rounded, size: 20),
-            tooltip: 'Exportar PDF',
-            onPressed: () => _exportPdf(context),
+            icon: const Icon(Icons.ios_share_rounded, size: 20),
+            tooltip: 'Exportar',
+            onPressed: () => _showExportSheet(context),
           ),
         ],
       ),
@@ -428,71 +440,105 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   Widget _buildDateSelector() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-      child: Row(
+      child: Column(
         children: [
-          // Month nav
-          if (_rangeMode == _RangeMode.month) ...[
-            GestureDetector(
-              onTap: () => _changeMonth(-1),
-              child: const Icon(Icons.chevron_left_rounded,
-                  color: Colors.white54, size: 22),
+          // Quick range chips
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _RangeChip(
+                label: 'Semana',
+                isActive: _rangeMode == _RangeMode.week,
+                onTap: () => setState(() => _rangeMode = _RangeMode.week),
+              ),
+              const SizedBox(width: 6),
+              _RangeChip(
+                label: 'Mes',
+                isActive: _rangeMode == _RangeMode.month,
+                onTap: () => setState(() => _rangeMode = _RangeMode.month),
+              ),
+              const SizedBox(width: 6),
+              _RangeChip(
+                label: 'Personalizado',
+                isActive: _rangeMode == _RangeMode.custom,
+                onTap: () {
+                  setState(() => _rangeMode = _RangeMode.custom);
+                  _pickCustomRange();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          // Month nav (only for month mode)
+          if (_rangeMode == _RangeMode.month)
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: () => _changeMonth(-1),
+                  child: const Icon(Icons.chevron_left_rounded,
+                      color: Colors.white54, size: 22),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _pickCustomRange,
+                    child: Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1E2C).withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.08)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.calendar_month_rounded,
+                              color: AppTheme.colorTransfer, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            _rangeLabel,
+                            style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () => _changeMonth(1),
+                  child: const Icon(Icons.chevron_right_rounded,
+                      color: Colors.white54, size: 22),
+                ),
+              ],
             ),
-            const SizedBox(width: 4),
-          ],
-          Expanded(
-            child: GestureDetector(
+          if (_rangeMode == _RangeMode.custom)
+            GestureDetector(
               onTap: _pickCustomRange,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E1E2C).withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.calendar_month_rounded,
-                        color: AppTheme.colorTransfer, size: 16),
+                    Icon(Icons.date_range_rounded, color: AppTheme.colorTransfer, size: 16),
                     const SizedBox(width: 6),
-                    Text(
-                      _rangeLabel,
-                      style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600),
-                    ),
-                    if (_rangeMode == _RangeMode.custom) ...[
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () => setState(
-                            () => _rangeMode = _RangeMode.month),
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Icon(Icons.close_rounded,
-                              color: Colors.white38, size: 14),
-                        ),
-                      ),
-                    ],
+                    Text(_rangeLabel, style: GoogleFonts.inter(
+                      color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600,
+                    )),
                   ],
                 ),
               ),
             ),
-          ),
-          if (_rangeMode == _RangeMode.month) ...[
-            const SizedBox(width: 4),
-            GestureDetector(
-              onTap: () => _changeMonth(1),
-              child: const Icon(Icons.chevron_right_rounded,
-                  color: Colors.white54, size: 22),
-            ),
-          ],
         ],
       ),
     );
@@ -527,7 +573,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -743,7 +789,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -883,7 +929,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -964,7 +1010,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   }) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1168,7 +1214,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1473,6 +1519,95 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   }
 
   // ─── PDF Export ─────────────────────────────────────
+  void _showExportSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E2C),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Exportar datos', style: GoogleFonts.inter(
+                fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white,
+              )),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Icon(Icons.picture_as_pdf_rounded, color: Colors.red.shade300),
+                title: const Text('Reporte PDF', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Resumen mensual completo', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: Colors.white.withValues(alpha: 0.04),
+                onTap: () { Navigator.pop(ctx); _exportPdf(context); },
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(Icons.table_chart_rounded, color: Colors.green.shade300),
+                title: const Text('Exportar CSV', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Movimientos en planilla', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: Colors.white.withValues(alpha: 0.04),
+                onTap: () { Navigator.pop(ctx); _exportCsv(context); },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportCsv(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(
+        content: Text('Generando CSV...'),
+        duration: Duration(seconds: 1)));
+
+    try {
+      final allTxs = ref.read(transactionsStreamProvider).valueOrNull ?? [];
+      final transactions = _filterByRange(allTxs);
+      final accounts = ref.read(accountsStreamProvider).valueOrNull ?? [];
+      final categories = ref.read(categoriesStreamProvider).valueOrNull ?? [];
+
+      final catNames = <String, String>{};
+      for (final c in categories) { catNames[c.id] = c.name; }
+      for (final e in _categoryLabels.entries) { catNames.putIfAbsent(e.key, () => e.value); }
+      final accNames = <String, String>{};
+      for (final a in accounts) { accNames[a.id] = a.name; }
+
+      final path = await generateTransactionsCsv(
+        transactions: transactions,
+        categoryNames: catNames,
+        accountNames: accNames,
+        label: _rangeLabel.replaceAll(' ', '_').replaceAll('/', '-'),
+      );
+
+      if (context.mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text('CSV exportado (${transactions.length} movimientos)'),
+          action: SnackBarAction(
+              label: 'Abrir',
+              onPressed: () => OpenFilex.open(path)),
+        ));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
   Future<void> _exportPdf(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(const SnackBar(
@@ -1633,6 +1768,40 @@ class _DeltaChip extends StatelessWidget {
                   fontSize: 10,
                   fontWeight: FontWeight.w600)),
         ],
+      ),
+    );
+  }
+}
+
+class _RangeChip extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final VoidCallback onTap;
+  const _RangeChip({required this.label, required this.isActive, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppTheme.colorTransfer.withValues(alpha: 0.2)
+              : Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isActive
+                ? AppTheme.colorTransfer.withValues(alpha: 0.3)
+                : Colors.white.withValues(alpha: 0.06),
+          ),
+        ),
+        child: Text(label, style: TextStyle(
+          color: isActive ? AppTheme.colorTransfer : Colors.white38,
+          fontSize: 11,
+          fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+        )),
       ),
     );
   }

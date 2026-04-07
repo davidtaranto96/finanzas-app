@@ -195,6 +195,20 @@ class AccountService {
     ));
   }
 
+  /// Sets an account as the default (clears default on all others first).
+  Future<void> setDefaultAccount(String accountId) async {
+    await db.transaction(() async {
+      // Clear all defaults
+      await (db.update(db.accountsTable)).write(
+        const AccountsTableCompanion(isDefault: drift.Value(false)),
+      );
+      // Set new default
+      await (db.update(db.accountsTable)..where((t) => t.id.equals(accountId))).write(
+        const AccountsTableCompanion(isDefault: drift.Value(true)),
+      );
+    });
+  }
+
   /// Updates an existing account.
   Future<void> updateAccount({
     required String id,

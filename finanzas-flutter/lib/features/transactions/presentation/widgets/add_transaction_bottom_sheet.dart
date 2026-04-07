@@ -25,6 +25,8 @@ import '../../../wishlist/presentation/providers/wishlist_provider.dart';
 import '../../../../core/logic/wishlist_service.dart';
 import '../../../../core/providers/shell_providers.dart';
 import '../../../budget/domain/models/budget.dart' as dom_b;
+import '../../../../core/widgets/success_overlay.dart';
+import '../../../../core/services/notification_service.dart';
 
 // ─────────────────────────────────────────────────────────
 // Mapa de íconos y colores por categoría (compartido con tiles)
@@ -543,6 +545,8 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
             deadline: null,
           );
           if (mounted) {
+            await SuccessOverlay.show(context);
+            if (!mounted) return;
             Navigator.of(context).pop();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -575,6 +579,8 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
             );
           }
           if (mounted) {
+            await SuccessOverlay.show(context);
+            if (!mounted) return;
             Navigator.of(context).pop();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -611,6 +617,7 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
           if (tx.scenario == NLScenario.wishlistPurchase && tx.wishlistItemId != null) {
             await ref.read(wishlistServiceProvider).markAsPurchased(tx.wishlistItemId!, method: 'account');
           }
+          await _checkBudgetExceeded(tx.categoryId ?? 'other_expense', amount);
           break;
 
         case NLScenario.income:
@@ -878,6 +885,8 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
           if (lastTx != null) {
             await ref.read(transactionServiceProvider).duplicateTransaction(lastTx.id);
             if (mounted) {
+              await SuccessOverlay.show(context);
+              if (!mounted) return;
               Navigator.of(context).pop();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -926,18 +935,55 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
       }
 
       if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${tx.scenarioLabel} registrado: ${tx.title}'),
-            backgroundColor: Colors.green.withValues(alpha: 0.8),
-          ),
-        );
+        await SuccessOverlay.show(context);
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${tx.scenarioLabel} registrado: ${tx.title}'),
+              backgroundColor: Colors.green.withValues(alpha: 0.8),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // Budget exceeded check
+  // ─────────────────────────────────────────────
+  Future<void> _checkBudgetExceeded(String? categoryId, double amount) async {
+    if (categoryId == null) return;
+    final budgets = ref.read(budgetsStreamProvider).valueOrNull ?? [];
+    final budget = budgets.where((b) => b.categoryId == categoryId).firstOrNull;
+    if (budget == null) return;
+
+    final newSpent = budget.spentAmount + amount;
+    if (newSpent > budget.limitAmount) {
+      await NotificationService.showBudgetExceeded(
+        categoryName: budget.categoryName,
+        spent: newSpent,
+        limit: budget.limitAmount,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Presupuesto de ${budget.categoryName} excedido')),
+            ]),
+            backgroundColor: AppTheme.colorExpense.withValues(alpha: 0.9),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
     }
@@ -961,7 +1007,13 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
       note: _noteController.text.isNotEmpty ? _noteController.text : null,
       date: _manualDate,
     );
-    if (mounted) Navigator.pop(context);
+    if (typeStr == 'expense') {
+      await _checkBudgetExceeded(_selectedCategoryId, amount);
+    }
+    if (mounted) {
+      await SuccessOverlay.show(context);
+      if (mounted) Navigator.pop(context);
+    }
   }
 
   // ─────────────────────────────────────────────
@@ -988,12 +1040,12 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(2)))),
+            Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(3)))),
             const SizedBox(height: 20),
             Row(
               children: [
                 Expanded(
-                  child: Text('Movimiento', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white)),
+                  child: Text('Movimiento', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
                 ),
                 _SmartToggle(
                   isSmart: _isSmart,
@@ -1029,7 +1081,7 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
         AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
@@ -1076,7 +1128,7 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
                     : TextField(
                         controller: _aiController,
                         autofocus: true,
-                        style: GoogleFonts.inter(color: Colors.white, fontSize: 15),
+                        style: GoogleFonts.inter(color: Colors.white, fontSize: 16),
                         maxLines: 3,
                         minLines: 1,
                         decoration: InputDecoration(
@@ -1814,13 +1866,13 @@ class _AiConfirmationCardState extends ConsumerState<_AiConfirmationCard> {
           Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(_scenarioIcon, color: color, size: 22),
+                child: Icon(_scenarioIcon, color: color, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1911,13 +1963,13 @@ class _AiConfirmationCardState extends ConsumerState<_AiConfirmationCard> {
           Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(_scenarioIcon, color: color, size: 22),
+                child: Icon(_scenarioIcon, color: color, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1937,7 +1989,7 @@ class _AiConfirmationCardState extends ConsumerState<_AiConfirmationCard> {
                       ),
                       child: Text(
                         '"${_tx.rawInput}"',
-                        style: GoogleFonts.inter(color: Colors.white38, fontSize: 10),
+                        style: GoogleFonts.inter(color: Colors.white38, fontSize: 11),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1952,13 +2004,13 @@ class _AiConfirmationCardState extends ConsumerState<_AiConfirmationCard> {
           // Monto editable
           Row(
             children: [
-              const Text(r'$ ', style: TextStyle(color: Colors.white54, fontSize: 18)),
+              const Text(r'$ ', style: TextStyle(color: Colors.white54, fontSize: 22)),
               Expanded(
                 child: TextField(
                   controller: _amountCtrl,
                   keyboardType: TextInputType.number,
                   inputFormatters: [ThousandsSeparatorFormatter()],
-                  style: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white),
+                  style: GoogleFonts.inter(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.5),
                   decoration: const InputDecoration(border: InputBorder.none, isDense: true),
                   onChanged: (v) => _tx = _tx.copyWith(amount: parseFormattedAmount(v)),
                 ),
@@ -1969,7 +2021,7 @@ class _AiConfirmationCardState extends ConsumerState<_AiConfirmationCard> {
           // Título editable
           TextField(
             controller: _titleCtrl,
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
+            style: const TextStyle(color: Colors.white70, fontSize: 15),
             decoration: const InputDecoration(
               border: InputBorder.none,
               isDense: true,
@@ -2271,11 +2323,27 @@ class _AccountDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final effective = (value != null && accounts.any((a) => a.id == value!.id)) ? value : null;
+    final fmt = NumberFormat.compactCurrency(symbol: '\$', decimalDigits: 0, locale: 'es_AR');
+
+    // Ordenar: default primero, luego no-crédito por saldo desc, crédito por disponible desc
+    final sorted = List<dom_acc.Account>.from(accounts);
+    sorted.sort((a, b) {
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+      if (!a.isCreditCard && b.isCreditCard) return -1;
+      if (a.isCreditCard && !b.isCreditCard) return 1;
+      if (a.isCreditCard && b.isCreditCard) {
+        return b.availableCredit.compareTo(a.availableCredit);
+      }
+      return b.balance.compareTo(a.balance);
+    });
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
         border: Border.all(color: Colors.white10),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: DropdownButton<dom_acc.Account>(
         value: effective,
@@ -2284,20 +2352,37 @@ class _AccountDropdown extends StatelessWidget {
         underline: const SizedBox(),
         hint: const Text('Seleccioná cuenta', style: TextStyle(color: Colors.white38, fontSize: 13)),
         style: const TextStyle(color: Colors.white, fontSize: 13),
-        items: accounts.map((a) => DropdownMenuItem(
-          value: a,
-          child: Row(
-            children: [
-              Icon(
-                a.isCreditCard ? Icons.credit_card_rounded : Icons.account_balance_wallet_outlined,
-                size: 14,
-                color: Colors.white38,
-              ),
-              const SizedBox(width: 6),
-              Text(a.name),
-            ],
-          ),
-        )).toList(),
+        items: sorted.map((a) {
+          final available = a.isCreditCard ? a.availableCredit : a.balance;
+          final hasBalance = available > 0;
+          return DropdownMenuItem(
+            value: a,
+            child: Row(
+              children: [
+                Icon(
+                  a.isCreditCard ? Icons.credit_card_rounded : Icons.account_balance_wallet_outlined,
+                  size: 14,
+                  color: hasBalance ? Colors.white38 : Colors.white12,
+                ),
+                const SizedBox(width: 6),
+                Expanded(child: Text(a.name, overflow: TextOverflow.ellipsis)),
+                const SizedBox(width: 8),
+                Text(
+                  a.isCreditCard
+                      ? 'Disp ${fmt.format(available)}'
+                      : fmt.format(a.balance),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: hasBalance
+                        ? (a.isCreditCard ? const Color(0xFF4ECDC4) : Colors.white30)
+                        : const Color(0xFFFF6B6B),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
         onChanged: onChanged,
       ),
     );
@@ -2446,12 +2531,12 @@ class _InfoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
       ),
-      child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w500)),
+      child: Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500)),
     );
   }
 }

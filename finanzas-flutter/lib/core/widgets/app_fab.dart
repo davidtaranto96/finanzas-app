@@ -10,12 +10,14 @@ class AppFab extends ConsumerStatefulWidget {
   final IconData icon;
   final VoidCallback onPressed;
   final VoidCallback? onLongPress;
+  final VoidCallback? onDoubleTap;
 
   const AppFab({
     super.key,
     required this.icon,
     required this.onPressed,
     this.onLongPress,
+    this.onDoubleTap,
   });
 
   @override
@@ -81,6 +83,7 @@ class _AppFabState extends ConsumerState<AppFab> with SingleTickerProviderStateM
       onLongPressStart: widget.onLongPress != null ? _onLongPressStart : null,
       onLongPressEnd: widget.onLongPress != null ? _onLongPressEnd : null,
       onTap: widget.onPressed,
+      onDoubleTap: widget.onDoubleTap,
       child: AnimatedBuilder(
         animation: _pulseCtrl,
         builder: (context, child) {

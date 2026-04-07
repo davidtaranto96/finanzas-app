@@ -14,16 +14,26 @@ import '../providers/feedback_provider.dart';
 const _kCardDueChannel = 'card_due_dates';
 const _kDebtReminderChannel = 'debt_reminders';
 const _kGeneralChannel = 'general';
+const _kDailyReminderChannel = 'daily_reminder';
+const _kBudgetExceededChannel = 'budget_exceeded';
+const _kWeeklySummaryChannel = 'weekly_summary';
 
 // Notification ID ranges
 const _kCardDueBaseId = 1000;
 const _kDebtReminderBaseId = 2000;
+const _kDailyReminderId = 3000;
+const _kWeeklySummaryId = 3001;
+const _kBudgetExceededBaseId = 4000;
 
 // Prefs keys
 const _kNotifCardDueEnabled = 'notif_card_due_enabled';
 const _kNotifDebtRemindEnabled = 'notif_debt_remind_enabled';
 const _kNotifCardDueDaysBefore = 'notif_card_due_days_before';
 const _kNotifDebtRemindDays = 'notif_debt_remind_days';
+const _kNotifDailyReminderEnabled = 'notif_daily_reminder_enabled';
+const _kNotifDailyReminderHour = 'notif_daily_reminder_hour';
+const _kNotifDailyReminderMinute = 'notif_daily_reminder_minute';
+const _kNotifWeeklySummaryEnabled = 'notif_weekly_summary_enabled';
 
 /// Global plugin instance
 final FlutterLocalNotificationsPlugin _plugin =
@@ -54,6 +64,26 @@ final notifCardDueDaysBeforeProvider =
 final notifDebtRemindDaysProvider =
     StateNotifierProvider<IntPrefNotifier, int>(
   (ref) => IntPrefNotifier(_kNotifDebtRemindDays, defaultValue: 7),
+);
+
+final notifDailyReminderEnabledProvider =
+    StateNotifierProvider<BoolPrefNotifier, bool>(
+  (ref) => BoolPrefNotifier(_kNotifDailyReminderEnabled, defaultValue: false),
+);
+
+final notifDailyReminderHourProvider =
+    StateNotifierProvider<IntPrefNotifier, int>(
+  (ref) => IntPrefNotifier(_kNotifDailyReminderHour, defaultValue: 21),
+);
+
+final notifDailyReminderMinuteProvider =
+    StateNotifierProvider<IntPrefNotifier, int>(
+  (ref) => IntPrefNotifier(_kNotifDailyReminderMinute, defaultValue: 0),
+);
+
+final notifWeeklySummaryEnabledProvider =
+    StateNotifierProvider<BoolPrefNotifier, bool>(
+  (ref) => BoolPrefNotifier(_kNotifWeeklySummaryEnabled, defaultValue: false),
 );
 
 /// Int-backed pref notifier
@@ -197,6 +227,30 @@ class NotificationService {
             _kGeneralChannel,
             'General',
             description: 'Notificaciones generales de Sencillo',
+            importance: Importance.defaultImportance,
+          ),
+        );
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            _kDailyReminderChannel,
+            'Recordatorio diario',
+            description: 'Recordatorio para registrar gastos del día',
+            importance: Importance.defaultImportance,
+          ),
+        );
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            _kBudgetExceededChannel,
+            'Presupuesto excedido',
+            description: 'Alertas cuando se supera un presupuesto',
+            importance: Importance.high,
+          ),
+        );
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            _kWeeklySummaryChannel,
+            'Resumen semanal',
+            description: 'Resumen de gastos de la semana',
             importance: Importance.defaultImportance,
           ),
         );
@@ -376,6 +430,102 @@ class NotificationService {
     );
   }
 
+  /// Schedule daily expense reminder at configured time
+  Future<void> scheduleDailyReminder({required int hour, required int minute}) async {
+    await _plugin.cancel(_kDailyReminderId);
+
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    if (scheduled.isBefore(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+
+    await _plugin.zonedSchedule(
+      _kDailyReminderId,
+      '📝 Registrá tus gastos',
+      'No olvides anotar los gastos de hoy',
+      scheduled,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _kDailyReminderChannel,
+          'Recordatorio diario',
+          icon: '@mipmap/ic_launcher',
+          importance: Importance.defaultImportance,
+          color: const Color(0xFF6C63FF),
+        ),
+        iOS: const DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
+      ),
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
+  }
+
+  Future<void> cancelDailyReminder() async {
+    await _plugin.cancel(_kDailyReminderId);
+  }
+
+  /// Schedule weekly summary notification (Mondays at 9:00)
+  Future<void> scheduleWeeklySummary() async {
+    await _plugin.cancel(_kWeeklySummaryId);
+
+    final now = tz.TZDateTime.now(tz.local);
+    // Find next Monday
+    var daysUntilMonday = (DateTime.monday - now.weekday) % 7;
+    if (daysUntilMonday == 0) daysUntilMonday = 7;
+    final nextMonday = tz.TZDateTime(tz.local, now.year, now.month, now.day + daysUntilMonday, 9, 0);
+
+    await _plugin.zonedSchedule(
+      _kWeeklySummaryId,
+      '📊 Resumen semanal',
+      'Revisá cómo te fue esta semana con tus finanzas',
+      nextMonday,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _kWeeklySummaryChannel,
+          'Resumen semanal',
+          icon: '@mipmap/ic_launcher',
+          importance: Importance.defaultImportance,
+          color: const Color(0xFF6C63FF),
+        ),
+        iOS: const DarwinNotificationDetails(presentAlert: true, presentBadge: true),
+      ),
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+    );
+  }
+
+  Future<void> cancelWeeklySummary() async {
+    await _plugin.cancel(_kWeeklySummaryId);
+  }
+
+  /// Show immediate budget exceeded notification
+  static Future<void> showBudgetExceeded({
+    required String categoryName,
+    required double spent,
+    required double limit,
+  }) async {
+    final spentStr = '\$${spent.toStringAsFixed(0)}';
+    final limitStr = '\$${limit.toStringAsFixed(0)}';
+    await _plugin.show(
+      _kBudgetExceededBaseId + categoryName.hashCode.abs() % 999,
+      '⚠️ Presupuesto excedido',
+      '$categoryName: $spentStr de $limitStr',
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _kBudgetExceededChannel,
+          'Presupuesto excedido',
+          icon: '@mipmap/ic_launcher',
+          importance: Importance.high,
+          priority: Priority.high,
+          color: const Color(0xFFFF5252),
+        ),
+        iOS: const DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
+      ),
+    );
+  }
+
   Future<void> cancelCardDueReminders() async {
     for (int i = 0; i < 20; i++) {
       await _plugin.cancel(_kCardDueBaseId + i);
@@ -398,6 +548,10 @@ class NotificationService {
     final debtEnabled = ref.read(notifDebtRemindEnabledProvider);
     final cardDueDays = ref.read(notifCardDueDaysBeforeProvider);
     final debtDays = ref.read(notifDebtRemindDaysProvider);
+    final dailyEnabled = ref.read(notifDailyReminderEnabledProvider);
+    final dailyHour = ref.read(notifDailyReminderHourProvider);
+    final dailyMinute = ref.read(notifDailyReminderMinuteProvider);
+    final weeklyEnabled = ref.read(notifWeeklySummaryEnabledProvider);
 
     if (cardDueEnabled) {
       await scheduleCardDueReminders(daysBefore: cardDueDays);
@@ -409,6 +563,18 @@ class NotificationService {
       await scheduleDebtReminders(everyDays: debtDays);
     } else {
       await cancelDebtReminders();
+    }
+
+    if (dailyEnabled) {
+      await scheduleDailyReminder(hour: dailyHour, minute: dailyMinute);
+    } else {
+      await cancelDailyReminder();
+    }
+
+    if (weeklyEnabled) {
+      await scheduleWeeklySummary();
+    } else {
+      await cancelWeeklySummary();
     }
   }
 }

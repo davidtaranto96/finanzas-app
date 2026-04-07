@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/providers/mercado_pago_provider.dart';
 import '../../../../core/services/mercado_pago_service.dart';
 import '../../../../core/database/database_providers.dart';
+import '../../../../core/widgets/mp_account_selector_sheet.dart';
 
 class MercadoPagoPage extends ConsumerStatefulWidget {
   const MercadoPagoPage({super.key});
@@ -285,13 +286,18 @@ class _MercadoPagoPageState extends ConsumerState<MercadoPagoPage> {
     );
 
     if (shouldImport == true && mounted) {
-      _runSync();
+      _runSync(firstSync: true);
     }
   }
 
   /// Ejecuta la sincronización con feedback visual
-  Future<void> _runSync() async {
-    final result = await syncMercadoPago(ref);
+  Future<void> _runSync({bool firstSync = false}) async {
+    String? targetAccountId;
+    if (firstSync && mounted) {
+      targetAccountId = await showMpAccountSelectorSheet(context, ref);
+      // null means create new — that's the default behavior
+    }
+    final result = await syncMercadoPago(ref, targetAccountId: targetAccountId);
     if (!mounted) return;
 
     if (result != null) {

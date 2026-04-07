@@ -356,3 +356,11 @@ dom_tx.TransactionType _parseTransactionType(String type) {
     orElse: () => dom_tx.TransactionType.expense,
   );
 }
+
+// ── Recurring Transactions ──
+final recurringTransactionsStreamProvider = StreamProvider<List<RecurringTransactionEntity>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return (db.select(db.recurringTransactionsTable)
+        ..orderBy([(t) => OrderingTerm.asc(t.nextDate)]))
+      .watch();
+});

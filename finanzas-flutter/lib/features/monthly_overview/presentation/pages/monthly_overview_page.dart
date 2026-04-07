@@ -485,7 +485,7 @@ class _ResumenTab extends ConsumerWidget {
         await Future.delayed(const Duration(milliseconds: 300));
       },
       child: ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       children: [
         // ── Income section for past months ──
         if (!isCurrentMonth && totalExpense > 0) ...[
@@ -894,7 +894,7 @@ class _DetalleTab extends ConsumerWidget {
         else
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
               itemCount: grouped.length,
               itemBuilder: (context, groupIdx) {
                 final dateLabel = grouped.keys.elementAt(groupIdx);
@@ -1446,7 +1446,7 @@ class _CompartidosTab extends ConsumerWidget {
         0.0, (sum, t) => sum + (t.sharedRecovered ?? 0));
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       children: [
         // Summary banner
         if (sharedTxs.isNotEmpty) ...[
@@ -1559,7 +1559,7 @@ class _PrestamosTab extends ConsumerWidget {
     final totalReceived = received.fold(0.0, (s, t) => s + t.amount);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       children: [
         if (loans.isNotEmpty) ...[
           // Summary

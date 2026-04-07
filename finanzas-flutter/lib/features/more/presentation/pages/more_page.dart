@@ -14,10 +14,10 @@ import '../../../../core/services/cloud_backup_service.dart';
 import '../../../goals/presentation/providers/goals_provider.dart';
 import '../../../budget/presentation/pages/budget_page.dart';
 import '../../../transactions/presentation/pages/transactions_page.dart';
-import '../../../settings/presentation/pages/settings_page.dart'
-    show showTabConfigSheet;
+import '../../../../core/widgets/tab_config_sheet.dart';
 import 'help_page.dart' show showHelpSheet;
 import '../../../../core/services/notification_service.dart';
+import '../../../wishlist/presentation/pages/wishlist_page.dart';
 import '../widgets/my_qr_card.dart';
 
 class MorePage extends ConsumerStatefulWidget {
@@ -126,7 +126,11 @@ class _MorePageState extends ConsumerState<MorePage>
                     icon: Icons.shopping_cart_rounded,
                     label: 'Antojos',
                     color: AppTheme.colorWarning,
-                    onTap: () => context.push('/wishlist'),
+                    onTap: () => Navigator.of(context, rootNavigator: true).push(
+                      MaterialPageRoute(
+                        builder: (_) => const WishlistPage(standalone: true),
+                      ),
+                    ),
                   ),
                   _QuickTool(
                     icon: Icons.bar_chart_rounded,
@@ -203,7 +207,7 @@ class _MorePageState extends ConsumerState<MorePage>
                       _CompactRow(
                         icon: Icons.rocket_launch_rounded,
                         label: 'Novedades',
-                        subtitle: 'Versión actual: v1.5.5',
+                        subtitle: 'Versión actual: v1.5.7',
                         color: AppTheme.colorIncome,
                         onTap: () => context.push('/novedades'),
                       ),
@@ -340,7 +344,7 @@ class _MorePageState extends ConsumerState<MorePage>
                   child: GestureDetector(
                     onTap: () => context.push('/novedades'),
                     child: Text(
-                      'Sencillo · v1.5.5',
+                      'Sencillo · v1.5.7',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
@@ -353,7 +357,7 @@ class _MorePageState extends ConsumerState<MorePage>
               ),
             ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            const SliverToBoxAdapter(child: SizedBox(height: 120)),
           ],
         ),
       ),
@@ -788,14 +792,23 @@ class _BackupRowState extends ConsumerState<_BackupRow> {
 
     setState(() => _loading = true);
     try {
+      // Close current DB before replacing the file
+      final db = ref.read(databaseProvider);
+      await db.close();
+
       final service = CloudBackupService(uid: uid);
       await service.downloadBackup();
+
+      // Force Drift to reopen with the restored file
+      ref.invalidate(databaseProvider);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Backup restaurado. Reiniciá la app para ver los cambios.')),
+          const SnackBar(content: Text('Backup restaurado correctamente')),
         );
       }
     } catch (e) {
+      ref.invalidate(databaseProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }

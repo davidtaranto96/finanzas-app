@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +10,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_providers.dart';
 import '../../../../core/logic/wishlist_service.dart';
 import '../../../../core/logic/budget_service.dart';
+import '../../../../core/providers/price_tracker_provider.dart';
+import '../../../../core/services/meli_price_service.dart';
 
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/providers/shell_providers.dart';
@@ -20,7 +23,10 @@ import '../widgets/purchase_bottom_sheet.dart';
 import '../widgets/wishlist_budget_sheet.dart';
 
 class WishlistPage extends ConsumerWidget {
-  const WishlistPage({super.key});
+  /// [standalone] = true when pushed on top of the shell (from Más, router).
+  /// In standalone mode the page shows its own FAB.
+  final bool standalone;
+  const WishlistPage({super.key, this.standalone = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,8 +36,23 @@ class WishlistPage extends ConsumerWidget {
     final budgets = ref.watch(budgetsStreamProvider).valueOrNull ?? [];
     final shoppingBudget =
         budgets.where((b) => b.categoryId == 'shopping').firstOrNull;
+    final priceDrops = ref.watch(priceDropAlertsProvider);
+
+    // Trigger auto-check when page loads with items
+    final items = itemsAsync.valueOrNull ?? [];
+    if (items.isNotEmpty) {
+      // Use Future.microtask to avoid calling during build
+      Future.microtask(() => _autoCheckPrices(ref, items));
+    }
 
     return Scaffold(
+      floatingActionButton: standalone
+          ? FloatingActionButton(
+              onPressed: () => AddWishlistBottomSheet.show(context),
+              backgroundColor: AppTheme.colorWarning,
+              child: const Icon(Icons.add_rounded, color: Colors.white),
+            )
+          : null,
       appBar: AppBar(
         title: Text(
           'Compras Inteligentes',
@@ -39,6 +60,14 @@ class WishlistPage extends ConsumerWidget {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          if (items.any((i) => i.url != null && MeliPriceService.extractItemId(i.url ?? '') != null))
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, size: 20),
+              tooltip: 'Actualizar precios MeLi',
+              onPressed: () => _forceCheckPrices(context, ref, items),
+            ),
+        ],
       ),
       body: itemsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -51,13 +80,22 @@ class WishlistPage extends ConsumerWidget {
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
             physics: const BouncingScrollPhysics(),
-            itemCount: items.length + 1, // +1 for shopping budget
+            itemCount: items.length + 1 + (priceDrops.isNotEmpty ? 1 : 0),
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              if (index == 0) {
+              // Price drop alert banner
+              if (priceDrops.isNotEmpty && index == 0) {
+                return _PriceDropBanner(drops: priceDrops, onDismiss: () {
+                  ref.read(priceDropAlertsProvider.notifier).state = [];
+                });
+              }
+
+              final adjustedIndex = priceDrops.isNotEmpty ? index - 1 : index;
+
+              if (adjustedIndex == 0) {
                 return _ShoppingBudgetCard(budget: shoppingBudget);
               }
-              final item = items[index - 1];
+              final item = items[adjustedIndex - 1];
 
               // Find linked budget progress
               double? budgetSpent;
@@ -82,6 +120,125 @@ class WishlistPage extends ConsumerWidget {
             },
           );
         },
+      ),
+    );
+  }
+
+  static bool _autoCheckTriggered = false;
+
+  Future<void> _autoCheckPrices(WidgetRef ref, List<WishlistItem> items) async {
+    if (_autoCheckTriggered) return;
+    _autoCheckTriggered = true;
+    try {
+      final drops = await ref.read(priceTrackerProvider.notifier).autoCheckPrices(items);
+      if (drops.isNotEmpty) {
+        ref.read(priceDropAlertsProvider.notifier).state = drops;
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _forceCheckPrices(BuildContext context, WidgetRef ref, List<WishlistItem> items) async {
+    _autoCheckTriggered = false;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('price_tracker_last_auto_check');
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Actualizando precios de MercadoLibre...'),
+          backgroundColor: AppTheme.colorWarning.withValues(alpha: 0.8),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
+    final drops = await ref.read(priceTrackerProvider.notifier).autoCheckPrices(items);
+    if (drops.isNotEmpty) {
+      ref.read(priceDropAlertsProvider.notifier).state = drops;
+    }
+    if (context.mounted) {
+      final meliCount = items.where((i) => i.url != null && MeliPriceService.extractItemId(i.url ?? '') != null).length;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(drops.isNotEmpty
+              ? '${drops.length} producto${drops.length > 1 ? 's' : ''} bajó de precio!'
+              : '$meliCount precios actualizados'),
+          backgroundColor: drops.isNotEmpty
+              ? const Color(0xFF4CAF50).withValues(alpha: 0.8)
+              : AppTheme.colorWarning.withValues(alpha: 0.8),
+        ),
+      );
+    }
+  }
+}
+
+// ─── Price Drop Banner ──────────────────────────────────────
+
+class _PriceDropBanner extends StatelessWidget {
+  final List<PriceDropAlert> drops;
+  final VoidCallback onDismiss;
+  const _PriceDropBanner({required this.drops, required this.onDismiss});
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = NumberFormat.compactCurrency(symbol: '\$', decimalDigits: 0, locale: 'es_AR');
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF4CAF50).withValues(alpha: 0.15),
+            const Color(0xFF4CAF50).withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.trending_down_rounded, color: Color(0xFF4CAF50), size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${drops.length} producto${drops.length > 1 ? 's bajaron' : ' bajó'} de precio!',
+                  style: GoogleFonts.inter(
+                    fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF4CAF50),
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: onDismiss,
+                child: Icon(Icons.close_rounded, color: Colors.white30, size: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...drops.take(3).map((d) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                const SizedBox(width: 26),
+                Expanded(
+                  child: Text(d.itemTitle,
+                    style: GoogleFonts.inter(fontSize: 12, color: Colors.white70),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  '${fmt.format(d.oldPrice)} → ${fmt.format(d.newPrice)}',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF4CAF50),
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
       ),
     );
   }
@@ -588,6 +745,8 @@ class _WishlistCard extends ConsumerWidget {
                         ),
                       if (item.url != null && item.url!.isNotEmpty)
                         _UrlChip(url: item.url!),
+                      if (item.url != null && MeliPriceService.extractItemId(item.url!) != null)
+                        _MeliCheckChip(item: item),
                     ],
                   ),
                 ],
@@ -597,6 +756,75 @@ class _WishlistCard extends ConsumerWidget {
                   Text(item.note!,
                       style: TextStyle(color: Colors.white30, fontSize: 11)),
                 ],
+
+                // ── Price tracker ──
+                Builder(builder: (context) {
+                  final tracker = ref.watch(priceTrackerProvider);
+                  final history = tracker[item.id];
+                  final trend = history?.trend;
+                  final hasDrop = history?.hasDrop ?? false;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => _showPriceLogDialog(context, ref, item),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: hasDrop
+                                  ? const Color(0xFF4CAF50).withValues(alpha: 0.12)
+                                  : Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: hasDrop
+                                    ? const Color(0xFF4CAF50).withValues(alpha: 0.3)
+                                    : Colors.white.withValues(alpha: 0.08),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  trend == null
+                                      ? Icons.trending_flat_rounded
+                                      : (trend < 0 ? Icons.trending_down_rounded : Icons.trending_up_rounded),
+                                  size: 14,
+                                  color: trend == null
+                                      ? Colors.white30
+                                      : (trend < 0 ? const Color(0xFF4CAF50) : AppTheme.colorExpense),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  history != null && history.entries.isNotEmpty
+                                      ? '${history.entries.length} precios'
+                                      : 'Seguir precio',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: hasDrop ? const Color(0xFF4CAF50) : Colors.white38,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (hasDrop) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '¡Bajó de precio!',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF4CAF50),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
 
                 if (hourlyRate == null) ...[
                   const SizedBox(height: 8),
@@ -715,6 +943,142 @@ class _WishlistCard extends ConsumerWidget {
   }
 }
 
+// ─── Price Log Dialog ────────────────────────────────
+void _showPriceLogDialog(BuildContext context, WidgetRef ref, WishlistItem item) {
+  final ctrl = TextEditingController(text: item.estimatedCost.toStringAsFixed(0));
+  final tracker = ref.read(priceTrackerProvider);
+  final history = tracker[item.id];
+  final fmt = NumberFormat.compactCurrency(symbol: '\$', decimalDigits: 0, locale: 'es_AR');
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: const Color(0xFF18181F),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    isScrollControlled: true,
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 16),
+          Text('Seguimiento de precio',
+            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+          ),
+          const SizedBox(height: 4),
+          Text(item.title,
+            style: GoogleFonts.inter(fontSize: 13, color: Colors.white54),
+          ),
+          const SizedBox(height: 16),
+
+          // Price history
+          if (history != null && history.entries.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _PriceStat('Mínimo', fmt.format(history.lowestPrice!), const Color(0xFF4CAF50)),
+                      _PriceStat('Último', fmt.format(history.latestPrice!), Colors.white70),
+                      _PriceStat('Máximo', fmt.format(history.highestPrice!), AppTheme.colorExpense),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('${history.entries.length} registros',
+                    style: GoogleFonts.inter(fontSize: 10, color: Colors.white24),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // New price input
+          TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+            decoration: InputDecoration(
+              prefixText: '\$ ',
+              prefixStyle: TextStyle(
+                color: AppTheme.colorWarning, fontSize: 20, fontWeight: FontWeight.w700,
+              ),
+              hintText: 'Precio actual',
+              hintStyle: const TextStyle(color: Colors.white24),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: AppTheme.colorWarning),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              icon: const Icon(Icons.add_chart_rounded, size: 18),
+              label: const Text('Registrar precio'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.colorWarning,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () {
+                final val = double.tryParse(ctrl.text.replaceAll('.', '').replaceAll(',', '.'));
+                if (val != null && val > 0) {
+                  ref.read(priceTrackerProvider.notifier).logPrice(item.id, val);
+                  // Also update estimated cost if changed
+                  if (val != item.estimatedCost) {
+                    ref.read(wishlistServiceProvider).updateItem(item.id, estimatedCost: val);
+                  }
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Precio registrado: ${fmt.format(val)}'),
+                      backgroundColor: AppTheme.colorWarning.withValues(alpha: 0.8),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _PriceStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _PriceStat(this.label, this.value, this.color);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(label, style: GoogleFonts.inter(fontSize: 10, color: Colors.white38)),
+        const SizedBox(height: 2),
+        Text(value, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+      ],
+    );
+  }
+}
+
 // ─── Chips ────────────────────────────────────────────
 
 class _InfoChip extends StatelessWidget {
@@ -794,6 +1158,89 @@ class _UrlChip extends StatelessWidget {
                     color: textColor,
                     fontSize: 11,
                     fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MeliCheckChip extends ConsumerStatefulWidget {
+  final WishlistItem item;
+  const _MeliCheckChip({required this.item});
+
+  @override
+  ConsumerState<_MeliCheckChip> createState() => _MeliCheckChipState();
+}
+
+class _MeliCheckChipState extends ConsumerState<_MeliCheckChip> {
+  bool _loading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    const color = Color(0xFF00B1EA); // MeLi blue
+    final fmt = NumberFormat.compactCurrency(symbol: '\$', decimalDigits: 0, locale: 'es_AR');
+    final tracker = ref.watch(priceTrackerProvider);
+    final history = tracker[widget.item.id];
+    final lastMeliEntry = history?.entries
+        .where((e) => e.source == 'meli')
+        .lastOrNull;
+
+    return GestureDetector(
+      onTap: _loading ? null : () async {
+        setState(() => _loading = true);
+        final result = await ref
+            .read(priceTrackerProvider.notifier)
+            .checkSinglePrice(widget.item);
+        if (!mounted) return;
+        setState(() => _loading = false);
+        if (result != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${widget.item.title}: ${fmt.format(result.price)} en MeLi'),
+              backgroundColor: color.withValues(alpha: 0.8),
+            ),
+          );
+        } else {
+          final hasUrl = widget.item.url != null && widget.item.url!.isNotEmpty;
+          final hasValidId = hasUrl && MeliPriceService.isValidProductUrl(widget.item.url);
+          final apiError = MeliPriceService.lastError;
+          final msg = !hasUrl
+              ? 'Agregá un link de MercadoLibre al item'
+              : !hasValidId
+                  ? 'El link no contiene un ID de producto MeLi válido (MLA-...)'
+                  : apiError != null
+                      ? 'Error MeLi: $apiError'
+                      : 'No se pudo conectar con MercadoLibre';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg)),
+          );
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_loading)
+              SizedBox(
+                width: 12, height: 12,
+                child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
+              )
+            else
+              Icon(Icons.price_check_rounded, color: color, size: 12),
+            const SizedBox(width: 4),
+            Text(
+              lastMeliEntry != null
+                  ? fmt.format(lastMeliEntry.price)
+                  : 'Precio MeLi',
+              style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+            ),
           ],
         ),
       ),

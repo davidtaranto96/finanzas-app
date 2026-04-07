@@ -763,18 +763,45 @@ class _TxCard extends ConsumerWidget {
 
     return Dismissible(
       key: Key(tx.id),
-      direction: DismissDirection.endToStart,
+      direction: DismissDirection.horizontal,
       background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        decoration: BoxDecoration(
+          color: AppTheme.colorTransfer.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.edit_rounded, color: AppTheme.colorTransfer, size: 20),
+            const SizedBox(width: 6),
+            Text('Editar', style: TextStyle(color: AppTheme.colorTransfer, fontSize: 12, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+      secondaryBackground: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
           color: AppTheme.colorExpense.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: const Icon(Icons.delete_outline_rounded, color: AppTheme.colorExpense),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Eliminar', style: TextStyle(color: AppTheme.colorExpense, fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 6),
+            Icon(Icons.delete_outline_rounded, color: AppTheme.colorExpense, size: 20),
+          ],
+        ),
       ),
-      confirmDismiss: (_) async {
-        await _confirmDeleteDialog(context, ref, tx);
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          _showEditSheet(context, ref, tx, accounts);
+        } else {
+          await _confirmDeleteDialog(context, ref, tx);
+        }
         return false;
       },
       child: InkWell(

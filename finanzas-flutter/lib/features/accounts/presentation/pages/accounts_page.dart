@@ -170,7 +170,7 @@ class AccountsPage extends ConsumerWidget {
           body: Stack(
             children: [
               ListView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
                 itemCount: sorted.length,
                 itemBuilder: (context, index) {
                   final acc = sorted[index];

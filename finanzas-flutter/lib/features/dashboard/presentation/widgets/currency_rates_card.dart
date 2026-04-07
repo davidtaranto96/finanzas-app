@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/providers/currency_provider.dart';
+import '../../../../core/providers/currency_preferences_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class CurrencyRatesCard extends ConsumerWidget {
@@ -11,13 +12,16 @@ class CurrencyRatesCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ratesAsync = ref.watch(currencyRatesProvider);
+    final selected = ref.watch(selectedCurrenciesProvider);
 
     return ratesAsync.when(
       loading: () => const _ShimmerCard(),
       error: (_, __) => const SizedBox.shrink(), // falla silenciosamente
       data: (rates) {
         if (rates.isEmpty) return const SizedBox.shrink();
-        return _RatesCard(rates: rates);
+        final filtered = rates.where((r) => selected.contains(r.casa)).toList();
+        if (filtered.isEmpty) return const SizedBox.shrink();
+        return _RatesCard(rates: filtered);
       },
     );
   }
