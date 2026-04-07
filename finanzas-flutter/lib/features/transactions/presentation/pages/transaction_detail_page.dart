@@ -326,7 +326,12 @@ class TransactionDetailPage extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () async {
-              await ref.read(transactionServiceProvider).deleteTransaction(tx.id);
+              // Shared expenses need balance reversal — use people service
+              if (tx.isShared) {
+                await ref.read(peopleServiceProvider).deleteSharedExpenseTransaction(tx.id);
+              } else {
+                await ref.read(transactionServiceProvider).deleteTransaction(tx.id);
+              }
               if (context.mounted) {
                 Navigator.pop(ctx);
                 Navigator.pop(context);

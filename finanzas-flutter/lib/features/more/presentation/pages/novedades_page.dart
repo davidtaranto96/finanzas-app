@@ -25,11 +25,28 @@ class NovedadesPage extends StatelessWidget {
           _CurrentVersionBanner(),
           const SizedBox(height: 20),
 
+          // v1.6.0
+          _VersionCard(
+            version: 'v1.6.0',
+            date: '7 Abr 2026',
+            isCurrent: true,
+            items: const [
+              _ChangeItem(icon: Icons.bug_report_rounded, text: 'Fix crítico: eliminar gasto compartido ahora revierte correctamente el saldo de la persona', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.sync_problem_rounded, text: 'Fix: eliminar transferencia ahora revierte el saldo de ambas cuentas (origen y destino)', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.trending_up_rounded, text: 'Fix: editar el monto de un movimiento ahora recalcula el saldo de la cuenta correctamente', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.flag_rounded, text: 'Fix: eliminar un ahorro vinculado a un objetivo ahora revierte la contribución al objetivo', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.refresh_rounded, text: 'Smart refresh: deslizá hacia abajo en cualquier pantalla para limpiar datos inconsistentes y actualizar todo', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.health_and_safety_rounded, text: 'Nuevo servicio de integridad de datos: detecta y corrige deudas huérfanas y balances desincronizados automáticamente', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.group_rounded, text: 'Fix: recálculo de totales de grupos al detectar inconsistencias en el refresh', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.lock_rounded, text: 'Operaciones críticas ahora son atómicas: si algo falla a mitad, se revierte todo (sin datos a medias)', type: _ChangeType.improvement),
+            ],
+          ),
+
           // v1.5.8
           _VersionCard(
             version: 'v1.5.8',
             date: '7 Abr 2026',
-            isCurrent: true,
+            isCurrent: false,
             items: const [
               _ChangeItem(icon: Icons.check_circle_rounded, text: 'Animación de éxito al registrar movimientos: checkmark verde animado', type: _ChangeType.feature),
               _ChangeItem(icon: Icons.touch_app_rounded, text: 'Double-tap en FAB: duplica el último movimiento al instante', type: _ChangeType.feature),

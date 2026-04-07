@@ -398,6 +398,112 @@ class PeopleService {
     });
   }
 
+  /// Deletes a shared expense transaction and reverts the person's balance.
+  /// Use this instead of TransactionService.deleteTransaction for shared expenses.
+  Future<void> deleteSharedExpenseTransaction(String txId) async {
+    await db.transaction(() async {
+      final tx = await (db.select(db.transactionsTable)
+            ..where((t) => t.id.equals(txId)))
+          .getSingleOrNull();
+      if (tx == null) return;
+
+      // Only revert person balance if the transaction is linked to a person
+      if (tx.personId != null) {
+        final person = await (db.select(db.personsTable)
+              ..where((t) => t.id.equals(tx.personId!)))
+            .getSingleOrNull();
+        if (person != null) {
+          // Reverse the balance delta that was applied during recordSharedExpense:
+          // - iPaid (accountId != 'shared_obligation'): balance was +otherAmount → revert with -otherAmount
+          // - !iPaid (accountId == 'shared_obligation'): balance was -ownAmount → revert with +ownAmount
+          final iPaid = tx.accountId != 'shared_obligation';
+          final reverseDelta = iPaid
+              ? -(tx.sharedOtherAmount ?? 0)
+              : (tx.sharedOwnAmount ?? 0);
+
+          await (db.update(db.personsTable)..where((t) => t.id.equals(tx.personId!)))
+              .write(PersonsTableCompanion(
+            totalBalance: drift.Value(person.totalBalance + reverseDelta),
+          ));
+        }
+      }
+
+      // Revert group total if applicable
+      if (tx.groupId != null) {
+        final group = await (db.select(db.groupsTable)
+              ..where((t) => t.id.equals(tx.groupId!)))
+            .getSingleOrNull();
+        if (group != null) {
+          final groupExpenseRevert = tx.sharedTotalAmount ?? tx.amount;
+          await (db.update(db.groupsTable)..where((t) => t.id.equals(tx.groupId!)))
+              .write(GroupsTableCompanion(
+            totalGroupExpense: drift.Value(
+              (group.totalGroupExpense - groupExpenseRevert).clamp(0, double.infinity),
+            ),
+          ));
+        }
+      }
+
+      // Delete the transaction
+      await (db.delete(db.transactionsTable)..where((t) => t.id.equals(txId))).go();
+    });
+  }
+
+  /// Cleans up orphaned person balances: recalculates each person's totalBalance
+  /// from their existing shared transactions. Call on pull-to-refresh.
+  Future<int> fixOrphanedPersonBalances() async {
+    int fixed = 0;
+    final persons = await db.select(db.personsTable).get();
+
+    for (final person in persons) {
+      // Sum of otherAmount for transactions where iPaid (i.e. accountId != 'shared_obligation')
+      final iPaidRows = await (db.select(db.transactionsTable)
+            ..where((t) =>
+                t.personId.equals(person.id) &
+                t.isShared.equals(true) &
+                t.accountId.isNotValue('shared_obligation')))
+          .get();
+
+      // Sum of ownAmount for transactions where !iPaid
+      final theyPaidRows = await (db.select(db.transactionsTable)
+            ..where((t) =>
+                t.personId.equals(person.id) &
+                t.isShared.equals(true) &
+                t.accountId.equals('shared_obligation')))
+          .get();
+
+      // Also include liquidation transactions (loanGiven/loanReceived with personId)
+      final loanRows = await (db.select(db.transactionsTable)
+            ..where((t) =>
+                t.personId.equals(person.id) &
+                t.isShared.equals(false)))
+          .get();
+
+      double calculatedBalance = 0;
+      for (final tx in iPaidRows) {
+        calculatedBalance += tx.sharedOtherAmount ?? 0;
+      }
+      for (final tx in theyPaidRows) {
+        calculatedBalance -= tx.sharedOwnAmount ?? 0;
+      }
+      for (final tx in loanRows) {
+        if (tx.type == 'loanGiven') calculatedBalance += tx.amount;
+        if (tx.type == 'loanReceived') calculatedBalance -= tx.amount;
+        if (tx.type == 'income' && tx.personId != null) calculatedBalance -= tx.amount; // liquidation
+        if (tx.type == 'expense' && tx.personId != null && !tx.isShared) calculatedBalance += tx.amount;
+      }
+
+      if ((person.totalBalance - calculatedBalance).abs() > 0.01) {
+        await (db.update(db.personsTable)..where((t) => t.id.equals(person.id)))
+            .write(PersonsTableCompanion(
+          totalBalance: drift.Value(calculatedBalance),
+        ));
+        fixed++;
+      }
+    }
+    return fixed;
+  }
+
   /// Get all transactions for a specific person.
   Future<List<TransactionEntity>> getPersonTransactions(
       String personId) async {

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_providers.dart';
 import '../../../../core/logic/people_service.dart';
+import '../../../../core/logic/data_integrity_service.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../domain/models/person.dart';
@@ -15,20 +16,25 @@ import '../../../transactions/presentation/pages/transaction_detail_page.dart';
 import '../../../accounts/domain/models/account.dart' as dom_a;
 import 'add_expense_page.dart';
 
-class PersonDetailPage extends ConsumerWidget {
+class PersonDetailPage extends ConsumerStatefulWidget {
   final Person person;
   const PersonDetailPage({super.key, required this.person});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PersonDetailPage> createState() => _PersonDetailPageState();
+}
+
+class _PersonDetailPageState extends ConsumerState<PersonDetailPage> {
+  @override
+  Widget build(BuildContext context) {
     // Re-watch person for live updates
     final peopleAsync = ref.watch(peopleStreamProvider);
     final livePerson = peopleAsync.valueOrNull
-            ?.where((p) => p.id == person.id)
+            ?.where((p) => p.id == widget.person.id)
             .firstOrNull ??
-        person;
+        widget.person;
 
-    final txsAsync = ref.watch(personTransactionsProvider(person.id));
+    final txsAsync = ref.watch(personTransactionsProvider(widget.person.id));
     final isPositive = livePerson.totalBalance > 0;
     final isZero = livePerson.totalBalance == 0;
 
@@ -46,8 +52,19 @@ class PersonDetailPage extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1A),
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
+      body: RefreshIndicator(
+        color: AppTheme.colorTransfer,
+        backgroundColor: const Color(0xFF1E1E2C),
+        displacement: 80,
+        onRefresh: () async {
+          // Limpieza de integridad + invalidar providers para recargar datos
+          await ref.read(dataIntegrityServiceProvider).runFullCheck();
+          ref.invalidate(peopleStreamProvider);
+          ref.invalidate(personTransactionsProvider(widget.person.id));
+          await Future.delayed(const Duration(milliseconds: 400));
+        },
+        child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           // ── App Bar ──
           SliverAppBar(
@@ -188,6 +205,7 @@ class PersonDetailPage extends ConsumerWidget {
 
           const SliverToBoxAdapter(child: SizedBox(height: 60)),
         ],
+        ),
       ),
     );
   }

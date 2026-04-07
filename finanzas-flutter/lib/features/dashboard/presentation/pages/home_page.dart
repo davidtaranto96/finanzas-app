@@ -30,6 +30,7 @@ import '../../../../core/widgets/home_widget_config_sheet.dart';
 import '../../../../core/widgets/select_sheets.dart';
 import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/utils/currency_utils.dart';
+import '../../../../core/logic/data_integrity_service.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -348,8 +349,11 @@ class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClie
                     backgroundColor: const Color(0xFF1E1E2C),
                     displacement: 60,
                     onRefresh: () async {
+                      // Limpieza de integridad antes de recargar
+                      await ref.read(dataIntegrityServiceProvider).runFullCheck();
                       ref.invalidate(accountsStreamProvider);
                       ref.invalidate(transactionsStreamProvider);
+                      ref.invalidate(peopleStreamProvider);
                       await Future.delayed(const Duration(milliseconds: 600));
                     },
                     child: CustomScrollView(
