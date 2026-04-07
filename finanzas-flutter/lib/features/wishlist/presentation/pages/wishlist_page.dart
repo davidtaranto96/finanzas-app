@@ -976,7 +976,7 @@ void _showPriceHistorySheet(BuildContext context, WidgetRef ref, WishlistItem it
               ] else ...[
                 const SizedBox(height: 20),
                 Text('Sin registros todavía', style: TextStyle(color: Colors.white24, fontSize: 13)),
-                Text('Anotá el precio cada vez que lo mires', style: TextStyle(color: Colors.white16, fontSize: 11)),
+                Text('Anotá el precio cada vez que lo mires', style: TextStyle(color: Colors.white.withValues(alpha: 0.16), fontSize: 11)),
               ],
 
               // Add price input
