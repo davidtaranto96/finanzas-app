@@ -47,6 +47,34 @@ final mpSyncedIdsProvider = FutureProvider<Set<String>>((ref) async {
   return prefs.getStringList('mp_synced_ids')?.toSet() ?? {};
 });
 
+// ─── Linked Account ───────────────────────────────────────────────────────────
+const _linkedAccountKey = 'mp_linked_account_id';
+
+/// ID of the local account linked to Mercado Pago (null if none).
+/// Falls back to 'mp_ars' if MP is connected but no explicit link was saved.
+final mpLinkedAccountIdProvider = FutureProvider<String?>((ref) async {
+  ref.watch(_mpRefreshCounter);
+  final prefs = await SharedPreferences.getInstance();
+  final explicit = prefs.getString(_linkedAccountKey);
+  if (explicit != null) return explicit;
+  // Fallback: if MP is connected, check for default mp_ars account
+  final token = prefs.getString(_tokenKey);
+  if (token != null && token.isNotEmpty) return 'mp_ars';
+  return null;
+});
+
+/// Persist which local account is linked to MP.
+Future<void> setMpLinkedAccountId(String accountId) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString(_linkedAccountKey, accountId);
+}
+
+/// Clear the linked account (on disconnect).
+Future<void> clearMpLinkedAccountId() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove(_linkedAccountKey);
+}
+
 // ─── Token storage ─────────────────────────────────────────────────────────────
 
 /// Whether MP is connected (token exists)
@@ -99,6 +127,7 @@ Future<void> disconnectMercadoPago() async {
   await prefs.remove(_balanceTimestampKey);
   await prefs.remove(_movementsCacheKey);
   await prefs.remove(_movementsTimestampKey);
+  await clearMpLinkedAccountId();
   await MpSyncService.clearSyncData();
 }
 
@@ -263,6 +292,9 @@ Future<MpSyncResult?> syncMercadoPago(WidgetRef ref, {String? targetAccountId}) 
             'Importando $current de $total...';
       },
     );
+
+    // Persist linked account ID
+    await setMpLinkedAccountId(result.accountId);
 
     // Refresh cache
     _clearMpCache();
