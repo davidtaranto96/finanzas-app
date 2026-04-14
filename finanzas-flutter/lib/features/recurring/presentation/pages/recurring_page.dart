@@ -11,6 +11,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../transactions/presentation/widgets/add_transaction_bottom_sheet.dart'
     show kCategoryEmojis;
+import '../../../../core/widgets/page_coach.dart';
 
 const _frequencyLabels = {
   'daily': 'Diario',
@@ -25,6 +26,9 @@ class RecurringPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) showPageCoachIfNeeded(context, ref, 'recurring');
+    });
     final itemsAsync = ref.watch(recurringTransactionsStreamProvider);
     final accounts = ref.watch(accountsStreamProvider).valueOrNull ?? [];
 

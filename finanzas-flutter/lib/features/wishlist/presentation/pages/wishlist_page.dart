@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:go_router/go_router.dart';
+
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_providers.dart';
@@ -857,7 +857,7 @@ class _PriceHistoryButton extends ConsumerWidget {
             const SizedBox(width: 5),
             Text(
               hasEntries
-                  ? (hasDrop ? '↓ Bajó' : '${history!.entries.length} precios')
+                  ? (hasDrop ? '↓ Bajó' : '${history.entries.length} precios')
                   : 'Historial',
               style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
             ),

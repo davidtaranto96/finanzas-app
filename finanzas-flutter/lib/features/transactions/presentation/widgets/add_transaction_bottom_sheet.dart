@@ -27,6 +27,7 @@ import '../../../../core/providers/shell_providers.dart';
 import '../../../budget/domain/models/budget.dart' as dom_b;
 import '../../../../core/widgets/success_overlay.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/widgets/page_coach.dart';
 
 // ─────────────────────────────────────────────────────────
 // Mapa de íconos y colores por categoría (compartido con tiles)
@@ -122,6 +123,11 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
     super.initState();
     _initSpeech();
     _aiController.addListener(_onAiInputChanged);
+    // Mostrar mini-guía visual la primera vez que se abre
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showPageCoachIfNeeded(context, ref, 'addTransaction');
+    });
   }
 
   Future<void> _initSpeech() async {
@@ -179,11 +185,20 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
 
     await _speech.listen(
       onResult: (result) {
+        if (!mounted) return;
         setState(() => _aiController.text = result.recognizedWords);
+
+        // Auto-procesar cuando el motor de voz considera el resultado final
+        // (el usuario dejó de hablar y pasó el `pauseFor`). Así no hay que
+        // apretar "procesar" — queda hands-free.
+        if (result.finalResult && _aiController.text.trim().isNotEmpty) {
+          setState(() => _isListening = false);
+          _processAiInput();
+        }
       },
       localeId: 'es_AR',
       listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 3),
+      pauseFor: const Duration(seconds: 2),
     );
   }
 
@@ -962,9 +977,12 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
     if (categoryId == null) return;
     final budgets = ref.read(budgetsStreamProvider).valueOrNull ?? [];
     final budget = budgets.where((b) => b.categoryId == categoryId).firstOrNull;
-    if (budget == null) return;
+    if (budget == null || budget.limitAmount <= 0) return;
 
+    final oldPct = budget.spentAmount / budget.limitAmount;
     final newSpent = budget.spentAmount + amount;
+    final newPct = newSpent / budget.limitAmount;
+
     if (newSpent > budget.limitAmount) {
       await NotificationService.showBudgetExceeded(
         categoryName: budget.categoryName,
@@ -986,6 +1004,30 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
           ),
         );
       }
+    } else if (oldPct < 0.8 && newPct >= 0.8) {
+      // C6: cruzamos el umbral del 80% con este gasto
+      if (mounted) {
+        final pctInt = (newPct * 100).round();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(children: [
+              const Icon(Icons.trending_up_rounded,
+                  color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Llegaste al $pctInt% del presupuesto de ${budget.categoryName}',
+                ),
+              ),
+            ]),
+            backgroundColor: Colors.orange.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -998,21 +1040,49 @@ class _AddTransactionBottomSheetState extends ConsumerState<AddTransactionBottom
     appSound(ref, type: SoundType.success);
     final amount = parseFormattedAmount(_amountController.text);
     final typeStr = _type == TransactionType.income ? 'income' : _type == TransactionType.transfer ? 'transfer' : 'expense';
-    await ref.read(transactionServiceProvider).addTransaction(
-      title: _titleController.text.isEmpty ? 'Movimiento' : _titleController.text,
-      amount: amount,
-      type: typeStr,
-      categoryId: _selectedCategoryId,
-      accountId: _selectedAccount!.id,
-      note: _noteController.text.isNotEmpty ? _noteController.text : null,
-      date: _manualDate,
-    );
+    final savedTitle =
+        _titleController.text.isEmpty ? 'Movimiento' : _titleController.text;
+    final createdId =
+        await ref.read(transactionServiceProvider).addTransaction(
+              title: savedTitle,
+              amount: amount,
+              type: typeStr,
+              categoryId: _selectedCategoryId,
+              accountId: _selectedAccount!.id,
+              note: _noteController.text.isNotEmpty ? _noteController.text : null,
+              date: _manualDate,
+            );
     if (typeStr == 'expense') {
       await _checkBudgetExceeded(_selectedCategoryId, amount);
     }
     if (mounted) {
       await SuccessOverlay.show(context);
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      final messenger = ScaffoldMessenger.of(context);
+      navigator.pop();
+      // C1: SnackBar con Deshacer (8s)
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('$savedTitle — ${formatAmount(amount)}'),
+          backgroundColor: const Color(0xFF1A1A28),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 8),
+          action: SnackBarAction(
+            label: 'Deshacer',
+            textColor: const Color(0xFF5ECFB1),
+            onPressed: () async {
+              try {
+                await ref
+                    .read(transactionServiceProvider)
+                    .deleteTransaction(createdId);
+              } catch (_) {}
+            },
+          ),
+        ),
+      );
     }
   }
 

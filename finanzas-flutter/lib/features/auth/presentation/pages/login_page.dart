@@ -6,9 +6,13 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/feedback_provider.dart';
 import '../../../../core/providers/onboarding_provider.dart';
+import '../../../../core/providers/setup_wizard_provider.dart';
+import '../../../../core/providers/interactive_tour_provider.dart';
 import '../../../../core/database/database_providers.dart';
 import '../../../../core/database/database_seeder.dart';
 import '../../../../core/services/cloud_backup_service.dart';
+import '../../../../core/widgets/backup_restore_overlay.dart';
+import 'package:go_router/go_router.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -21,6 +25,12 @@ class _LoginPageState extends ConsumerState<LoginPage>
     with TickerProviderStateMixin {
   bool _loading = false;
   String? _error;
+
+  // Backup restore overlay state
+  bool _showRestoreOverlay = false;
+  String _restoreMessage = 'Restaurando tu información...';
+  bool _restoreSuccess = false;
+  bool _restoreError = false;
 
   late final AnimationController _pulseCtrl;
   late final AnimationController _floatCtrl;
@@ -108,64 +118,144 @@ class _LoginPageState extends ConsumerState<LoginPage>
 
   Future<void> _checkForBackup(String uid) async {
     if (!mounted) return;
-
     setState(() => _error = null);
 
+    bool foundBackup = false;
     try {
       final backupService = CloudBackupService(uid: uid);
       final remoteDate = await backupService.remoteBackupDate();
-
       if (!mounted) return;
 
-      if (remoteDate == null) {
-        // No backup exists — just proceed
-        return;
-      }
+      if (remoteDate != null) {
+        foundBackup = true;
 
-      // Backup found → auto-restore
-      final dateStr = '${remoteDate.day}/${remoteDate.month}/${remoteDate.year}';
-
-      try {
-        // Close current DB before replacing the file
+        // A4: si hay datos locales "significativos" (>=5 txs), preguntar antes de overwritear
         final db = ref.read(databaseProvider);
-        await db.close();
+        final localTxCount = await db
+            .customSelect('SELECT COUNT(*) AS c FROM transactions_table')
+            .getSingle()
+            .then((r) => r.read<int>('c'));
 
-        await backupService.downloadBackup();
-
-        // Force Drift to reopen with the restored file
-        ref.invalidate(databaseProvider);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Backup del $dateStr restaurado automáticamente',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-              ),
-              backgroundColor: const Color(0xFF5ECFB1),
-              duration: const Duration(seconds: 3),
-            ),
-          );
+        if (localTxCount >= 5 && mounted) {
+          final choice = await _askBackupConflict(
+              remoteDate: remoteDate, localTxCount: localTxCount);
+          if (choice == null || choice == 'cancel') {
+            // Usuario canceló → no hacemos nada, se queda en login
+            if (mounted) setState(() => _loading = false);
+            return;
+          }
+          if (choice == 'keep_local') {
+            // Subir datos locales (sobreescribir nube)
+            try {
+              await backupService.uploadBackup();
+            } catch (_) {}
+            // Marcar setup como done y navegar
+            await ref.read(setupWizardProvider).complete();
+            await ref.read(interactiveTourProvider).complete();
+            if (mounted) context.go('/home');
+            return;
+          }
+          // choice == 'use_remote' → sigue el flow normal de restore
         }
-      } catch (e) {
-        // If close/restore fails, invalidate DB anyway so a fresh one is created
-        ref.invalidate(databaseProvider);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Error al restaurar backup: $e',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-              ),
-              backgroundColor: Colors.redAccent,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+
+        // Show overlay while we download + reopen DB
+        setState(() {
+          _showRestoreOverlay = true;
+          _restoreMessage = 'Restaurando tu información...';
+          _restoreSuccess = false;
+          _restoreError = false;
+        });
+
+        try {
+          await db.close();
+          await backupService.downloadBackup();
+          ref.invalidate(databaseProvider);
+
+          // Mark setup wizard + tour as complete (returning user)
+          await ref.read(setupWizardProvider).complete();
+          await ref.read(interactiveTourProvider).complete();
+
+          if (mounted) {
+            setState(() {
+              _restoreSuccess = true;
+              _restoreMessage = '¡Listo! Tus datos se sincronizaron';
+            });
+            await Future.delayed(const Duration(milliseconds: 1200));
+            if (mounted) {
+              setState(() => _showRestoreOverlay = false);
+              context.go('/home');
+            }
+          }
+          return;
+        } catch (e) {
+          ref.invalidate(databaseProvider);
+          if (mounted) {
+            setState(() {
+              _restoreError = true;
+              _restoreMessage = 'No pudimos restaurar tu backup';
+            });
+            await Future.delayed(const Duration(milliseconds: 1500));
+            if (mounted) setState(() => _showRestoreOverlay = false);
+          }
         }
       }
     } catch (_) {
-      // Network error or no backup — silently continue
+      // Network error — fall through to wizard
     }
+
+    // New user (no backup) or restore failed → run setup wizard
+    if (!foundBackup && mounted) {
+      final wizard = ref.read(setupWizardProvider);
+      if (!wizard.isComplete) {
+        context.go('/setup-wizard');
+      }
+    }
+  }
+
+  Future<String?> _askBackupConflict({
+    required DateTime remoteDate,
+    required int localTxCount,
+  }) async {
+    final dateStr = '${remoteDate.day}/${remoteDate.month}/${remoteDate.year}';
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title: Text(
+          'Ya tenés datos en este dispositivo',
+          style: GoogleFonts.quicksand(
+              color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'En la nube tenés un backup del $dateStr.\n'
+          'En este dispositivo tenés $localTxCount movimientos cargados.\n\n'
+          '¿Qué querés hacer?',
+          style: GoogleFonts.inter(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'cancel'),
+            child: Text('Cancelar',
+                style: GoogleFonts.inter(color: Colors.white38)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'keep_local'),
+            child: Text('Usar los de acá',
+                style: GoogleFonts.inter(
+                    color: const Color(0xFF5ECFB1),
+                    fontWeight: FontWeight.w700)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'use_remote'),
+            child: Text('Restaurar nube',
+                style: GoogleFonts.inter(
+                    color: const Color(0xFF40C4FF),
+                    fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _startWithoutAccount({required bool loadDemo}) async {
@@ -185,15 +275,23 @@ class _LoginPageState extends ConsumerState<LoginPage>
       await ref.read(needsInAppTourProvider).enable();
     }
 
-    // Router will now allow navigation to /home
-    if (mounted) setState(() => _loading = false);
+    // Router will now allow navigation — run setup wizard for non-demo users
+    if (mounted) {
+      setState(() => _loading = false);
+      if (!loadDemo && !ref.read(setupWizardProvider).isComplete) {
+        context.go('/setup-wizard');
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
-    return Scaffold(
+    return PopScope(
+      // Bloquea el back durante el restore para evitar DB corrupta.
+      canPop: !_showRestoreOverlay || _restoreError || _restoreSuccess,
+      child: Scaffold(
       backgroundColor: const Color(0xFF0F0F1A),
       body: GestureDetector(
         onTapDown: _onTouchDown,
@@ -424,21 +522,6 @@ class _LoginPageState extends ConsumerState<LoginPage>
                         borderColor: Colors.white.withValues(alpha: 0.1),
                       ),
 
-                      const SizedBox(height: 12),
-
-                      // ── 3. Datos de prueba ──
-                      _LoginOption(
-                        onTap: () => _startWithoutAccount(loadDemo: true),
-                        icon: Icons.science_rounded,
-                        label: 'Probar con datos demo',
-                        sublabel: 'Explorá la app con datos de ejemplo',
-                        gradient: [
-                          Colors.white.withValues(alpha: 0.04),
-                          Colors.white.withValues(alpha: 0.02),
-                        ],
-                        borderColor: Colors.white.withValues(alpha: 0.07),
-                        compact: true,
-                      ),
                     ],
 
                     const SizedBox(height: 12),
@@ -491,7 +574,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                     const SizedBox(height: 8),
 
                     Text(
-                      'v1.5.6',
+                      'v1.7.0',
                       style: GoogleFonts.inter(
                         fontSize: 10,
                         color: Colors.white.withValues(alpha: 0.08),
@@ -504,9 +587,18 @@ class _LoginPageState extends ConsumerState<LoginPage>
                 ),
               ),
             ),
+
+            // ── Backup restore overlay (on top of everything) ──
+            if (_showRestoreOverlay)
+              BackupRestoreOverlay(
+                message: _restoreMessage,
+                success: _restoreSuccess,
+                error: _restoreError,
+              ),
           ],
         ),
       ),
+    ),
     );
   }
 }

@@ -62,6 +62,7 @@ class AccountsPage extends ConsumerWidget {
 
     final accountsAsync = ref.watch(accountsStreamProvider);
     final customOrder = ref.watch(accountOrderProvider);
+    final sortMode = ref.watch(accountSortModeProvider);
     final txsAsync = ref.watch(transactionsStreamProvider);
     final mpLinkedId = ref.watch(mpLinkedAccountIdProvider).valueOrNull;
 
@@ -112,6 +113,25 @@ class AccountsPage extends ConsumerWidget {
             periodSpendByAccount[acc.id] = total;
           }
         }
+        // Group accounts by type
+        final groups = <String, List<dom.Account>>{};
+        for (final acc in sorted) {
+          final key = (mpLinkedId != null && acc.id == mpLinkedId)
+              ? 'mp'
+              : acc.type.name;
+          groups.putIfAbsent(key, () => []).add(acc);
+        }
+        // Display order for groups
+        const groupOrder = ['cash', 'bank', 'mp', 'savings', 'investment', 'credit'];
+        const groupLabels = {
+          'cash': 'Efectivo',
+          'bank': 'Debito',
+          'mp': 'Mercado Pago',
+          'savings': 'Ahorro',
+          'investment': 'Inversion',
+          'credit': 'Tarjetas de credito',
+        };
+
         return Scaffold(
           appBar: AppBar(
             backgroundColor: Colors.transparent,
@@ -122,36 +142,97 @@ class AccountsPage extends ConsumerWidget {
                   GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 20),
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.swap_vert_rounded, size: 22),
-                tooltip: 'Reordenar',
-                onPressed: () => _showReorderSheet(context, ref, sorted),
+              // Sort mode toggle
+              PopupMenuButton<String>(
+                icon: Icon(
+                  sortMode == AccountSortMode.manual
+                      ? Icons.swap_vert_rounded
+                      : Icons.auto_awesome_rounded,
+                  size: 22,
+                ),
+                color: const Color(0xFF1E1E2C),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                onSelected: (val) {
+                  if (val == 'auto') {
+                    ref.read(accountSortModeProvider.notifier).setMode(AccountSortMode.auto);
+                    ref.read(accountOrderProvider.notifier).clear();
+                  } else if (val == 'manual') {
+                    ref.read(accountSortModeProvider.notifier).setMode(AccountSortMode.manual);
+                    _showReorderSheet(context, ref, sorted);
+                  } else if (val == 'reorder') {
+                    _showReorderSheet(context, ref, sorted);
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'auto',
+                    child: Row(children: [
+                      Icon(Icons.auto_awesome_rounded, size: 18,
+                          color: sortMode == AccountSortMode.auto ? AppTheme.colorTransfer : Colors.white54),
+                      const SizedBox(width: 10),
+                      Text('Automatico',
+                          style: TextStyle(
+                            color: sortMode == AccountSortMode.auto ? AppTheme.colorTransfer : Colors.white,
+                            fontWeight: sortMode == AccountSortMode.auto ? FontWeight.w600 : FontWeight.w400,
+                          )),
+                    ]),
+                  ),
+                  PopupMenuItem(
+                    value: 'manual',
+                    child: Row(children: [
+                      Icon(Icons.swap_vert_rounded, size: 18,
+                          color: sortMode == AccountSortMode.manual ? AppTheme.colorTransfer : Colors.white54),
+                      const SizedBox(width: 10),
+                      Text('Manual',
+                          style: TextStyle(
+                            color: sortMode == AccountSortMode.manual ? AppTheme.colorTransfer : Colors.white,
+                            fontWeight: sortMode == AccountSortMode.manual ? FontWeight.w600 : FontWeight.w400,
+                          )),
+                    ]),
+                  ),
+                  if (sortMode == AccountSortMode.manual)
+                    const PopupMenuItem(
+                      value: 'reorder',
+                      child: Row(children: [
+                        Icon(Icons.drag_handle_rounded, size: 18, color: Colors.white54),
+                        SizedBox(width: 10),
+                        Text('Reordenar', style: TextStyle(color: Colors.white)),
+                      ]),
+                    ),
+                ],
               ),
               const SizedBox(width: 4),
             ],
           ),
           body: Stack(
             children: [
-              ListView.builder(
+              ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
-                itemCount: sorted.length,
-                itemBuilder: (context, index) {
-                  final acc = sorted[index];
-                  return _AccountCard(
-                    account: acc,
-                    monthSpend: monthSpendByAccount[acc.id] ?? 0.0,
-                    periodSpend: periodSpendByAccount[acc.id],
-                    isMpLinked: mpLinkedId != null && acc.id == mpLinkedId,
-                    onTap: () => context.push('/accounts/${acc.id}'),
-                    onLongPress: () =>
-                        _showAccountOptions(context, ref, acc),
-                    onPayStatement: acc.isCreditCard &&
-                            acc.pendingStatementAmount > 0
-                        ? () =>
-                            _showPayStatementDialog(context, ref, acc)
-                        : null,
-                  );
-                },
+                children: [
+                  if (sortMode == AccountSortMode.auto) ...[
+                    // Grouped by type
+                    for (final groupKey in groupOrder)
+                      if (groups.containsKey(groupKey)) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10, top: 6),
+                          child: Text(
+                            groupLabels[groupKey] ?? groupKey,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white38,
+                            ),
+                          ),
+                        ),
+                        for (final acc in groups[groupKey]!)
+                          _buildAccountCard(context, ref, acc, monthSpendByAccount, periodSpendByAccount, mpLinkedId),
+                      ],
+                  ] else ...[
+                    // Manual order — flat list
+                    for (final acc in sorted)
+                      _buildAccountCard(context, ref, acc, monthSpendByAccount, periodSpendByAccount, mpLinkedId),
+                  ],
+                ],
               ),
               if (standalone)
                 Positioned(
@@ -170,6 +251,27 @@ class AccountsPage extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAccountCard(
+    BuildContext context,
+    WidgetRef ref,
+    dom.Account acc,
+    Map<String, double> monthSpendByAccount,
+    Map<String, double> periodSpendByAccount,
+    String? mpLinkedId,
+  ) {
+    return _AccountCard(
+      account: acc,
+      monthSpend: monthSpendByAccount[acc.id] ?? 0.0,
+      periodSpend: periodSpendByAccount[acc.id],
+      isMpLinked: mpLinkedId != null && acc.id == mpLinkedId,
+      onTap: () => context.push('/accounts/${acc.id}'),
+      onLongPress: () => _showAccountOptions(context, ref, acc),
+      onPayStatement: acc.isCreditCard && acc.pendingStatementAmount > 0
+          ? () => _showPayStatementDialog(context, ref, acc)
+          : null,
     );
   }
 
@@ -1017,38 +1119,71 @@ class _AccountCard extends StatelessWidget {
 
   static const _mpBlue = Color(0xFF009EE3);
 
+  // Colors by account type
+  static Color _typeColor(dom.Account acc, bool isMp) {
+    if (isMp) return _mpBlue;
+    switch (acc.type) {
+      case dom.AccountType.cash:
+        return const Color(0xFF4CAF50); // green
+      case dom.AccountType.bank:
+        return const Color(0xFF42A5F5); // blue
+      case dom.AccountType.credit:
+        return const Color(0xFFFF7043); // orange-red
+      case dom.AccountType.savings:
+        return const Color(0xFF7C4DFF); // purple
+      case dom.AccountType.investment:
+        return const Color(0xFFFFB300); // gold
+    }
+  }
+
+  static String _typeLabel(dom.Account acc, bool isMp) {
+    if (isMp) return 'MP';
+    switch (acc.type) {
+      case dom.AccountType.cash:
+        return 'Efectivo';
+      case dom.AccountType.bank:
+        return 'Debito';
+      case dom.AccountType.credit:
+        return 'Credito';
+      case dom.AccountType.savings:
+        return 'Ahorro';
+      case dom.AccountType.investment:
+        return 'Inversion';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final acc = account;
-    final accColor = isMpLinked ? _mpBlue : getAccountColor(acc);
+    final typeColor = _typeColor(acc, isMpLinked);
     final isDefault = acc.isDefault;
 
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: isMpLinked
-              ? const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF009EE3), Color(0xFF00B1EA)],
-                )
-              : null,
-          color: isMpLinked ? null : const Color(0xFF1E1E2C),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              typeColor.withValues(alpha: 0.12),
+              typeColor.withValues(alpha: 0.04),
+            ],
+          ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isMpLinked
-                ? Colors.transparent
-                : isDefault
-                    ? accColor.withValues(alpha: 0.3)
-                    : Colors.white.withValues(alpha: 0.05),
+            color: typeColor.withValues(alpha: 0.25),
           ),
-          boxShadow: isMpLinked
-              ? [BoxShadow(color: _mpBlue.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 4))]
-              : null,
+          boxShadow: [
+            BoxShadow(
+              color: typeColor.withValues(alpha: 0.12),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -1057,14 +1192,12 @@ class _AccountCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isMpLinked
-                        ? Colors.white.withValues(alpha: 0.2)
-                        : accColor.withValues(alpha: 0.1),
+                    color: typeColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
                       getAccountIcon(acc.icon ?? 'wallet'),
-                      color: isMpLinked ? Colors.white : accColor),
+                      color: typeColor),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -1088,12 +1221,12 @@ class _AccountCard extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
+                                color: _mpBlue.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text('MP',
                                   style: GoogleFonts.inter(
-                                      color: Colors.white,
+                                      color: _mpBlue,
                                       fontSize: 9,
                                       fontWeight: FontWeight.w800)),
                             ),
@@ -1104,64 +1237,72 @@ class _AccountCard extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: isMpLinked
-                                    ? Colors.white.withValues(alpha: 0.2)
-                                    : accColor.withValues(alpha: 0.15),
+                                color: typeColor.withValues(alpha: 0.15),
                                 borderRadius:
                                     BorderRadius.circular(6),
                               ),
                               child: Text('Por defecto',
                                   style: TextStyle(
-                                      color: isMpLinked ? Colors.white : accColor,
+                                      color: typeColor,
                                       fontSize: 9,
                                       fontWeight: FontWeight.w600)),
                             ),
                           ],
+                          // Type badge
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: typeColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              _typeLabel(acc, isMpLinked),
+                              style: TextStyle(
+                                color: typeColor,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
-                      Text(
-                        acc.isCreditCard
-                            ? formatAmount(periodSpend ?? monthSpend)
-                            : formatAmount(acc.balance),
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                        ),
-                      ),
-                      if (acc.pendingStatementAmount > 0)
+                      if (acc.isCreditCard) ...[
+                        // Credit card: show spending as negative
                         Text(
-                          'Deuda pendiente: ${formatAmount(acc.pendingStatementAmount)}',
-                          style: TextStyle(
-                              color: AppTheme.colorExpense,
-                              fontSize: 10),
+                          '-${formatAmount(periodSpend ?? monthSpend)}',
+                          style: GoogleFonts.inter(
+                            color: AppTheme.colorExpense,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
                         ),
-                      if (acc.isCreditCard && monthSpend > 0 && periodSpend != null && monthSpend != periodSpend)
+                        if (acc.pendingStatementAmount > 0)
+                          Text(
+                            'Resumen pendiente: -${formatAmount(acc.pendingStatementAmount)}',
+                            style: TextStyle(
+                                color: AppTheme.colorExpense.withValues(alpha: 0.7),
+                                fontSize: 10),
+                          ),
+                        if (acc.creditLimit != null && acc.creditLimit! > 0)
+                          Text(
+                            'Disponible: ${formatAmount(acc.creditLimit! - (periodSpend ?? monthSpend))}',
+                            style: TextStyle(
+                                color: AppTheme.colorIncome.withValues(alpha: 0.7),
+                                fontSize: 10),
+                          ),
+                      ] else ...[
+                        // Non-credit: show positive balance
                         Text(
-                          'Mes calendario: ${formatAmount(monthSpend)}',
-                          style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.5),
-                              fontSize: 10),
+                          formatAmount(acc.balance),
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
                         ),
-                      if (acc.isCreditCard && acc.creditLimit != null && acc.creditLimit! > 0)
-                        Text(
-                          'Disponible: ${formatAmount(acc.creditLimit! - (periodSpend ?? monthSpend))}',
-                          style: TextStyle(
-                              color: accColor.withValues(alpha: 0.7),
-                              fontSize: 10),
-                        ),
+                      ],
                       const SizedBox(height: 4),
-                      Text(
-                        acc.isCreditCard
-                            ? 'Tarjeta de crédito'
-                            : (acc.type == dom.AccountType.cash
-                                ? 'Efectivo'
-                                : 'Cuenta'),
-                        style: TextStyle(
-                            color: accColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600),
-                      ),
                       // Alias / CVU copy row
                       if ((acc.alias != null && acc.alias!.isNotEmpty) ||
                           (acc.cvu != null && acc.cvu!.isNotEmpty)) ...[

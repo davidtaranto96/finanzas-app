@@ -33,6 +33,13 @@ import '../widgets/app_fab.dart';
 import '../logic/transaction_service.dart';
 import '../widgets/success_overlay.dart';
 import '../widgets/ai_assistant_sheet.dart';
+import '../widgets/tour_keys.dart';
+import '../services/widget_service.dart';
+import '../services/interactive_tour_service.dart';
+import '../providers/interactive_tour_provider.dart';
+import '../widgets/page_coach.dart';
+import '../services/notification_listener_service.dart';
+import 'package:home_widget/home_widget.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -76,7 +83,95 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
       ref.read(recurringServiceProvider).processRecurrings();
       _checkInAppAlerts();
       _tryAutoSyncMercadoPago();
+
+      // Handle notification action taps (e.g. "Agregar gasto" from daily reminder)
+      NotificationService.onActionTapped = (actionId) {
+        if (actionId == kActionAddExpense && mounted) {
+          AddTransactionBottomSheet.show(context);
+        }
+      };
+
+      // Refresh home screen widget with current data
+      ref.read(widgetServiceProvider).refresh();
+
+      // Handle deep links from home screen widget.
+      // Every widget click sends a `sencillo://<host>[?period=...]` URI.
+      // Cold start: the path is mapped in GoRouter.redirect → we land on /home
+      // and this handler then fires to trigger the appropriate sheet/action.
+      HomeWidget.widgetClicked.listen((uri) {
+        if (!mounted || uri == null) return;
+        final host = uri.host.isNotEmpty ? uri.host : uri.pathSegments.firstOrNull;
+        switch (host) {
+          case 'quick-voice':
+            showAiAssistantSheet(context);
+          case 'quick-expense':
+          case 'add':
+            AddTransactionBottomSheet.show(context);
+          case 'gastos':
+          case 'transactions':
+            context.go('/transactions');
+          case 'cotizaciones':
+          case 'dollar':
+          case 'rates':
+          case 'crypto':
+          case 'acciones':
+          case 'stocks':
+            context.go('/home');
+          case 'accounts':
+            context.go('/accounts');
+          case 'budget':
+            context.go('/budget');
+          case 'goals':
+            context.go('/goals');
+          default:
+            // Unknown → stay where we are (safe no-op)
+            break;
+        }
+      });
+      // Cold-start check: if app was launched by widget tap, the URI might
+      // not have fired widgetClicked yet. home_widget.initiallyLaunchedFromHomeWidget
+      // returns the URI if so.
+      HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
+        if (!mounted || uri == null) return;
+        final host = uri.host.isNotEmpty ? uri.host : uri.pathSegments.firstOrNull;
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (!mounted) return;
+          switch (host) {
+            case 'quick-voice':
+              showAiAssistantSheet(context);
+            case 'quick-expense':
+            case 'add':
+              AddTransactionBottomSheet.show(context);
+            case 'gastos':
+            case 'transactions':
+              context.go('/transactions');
+            case 'accounts':
+              context.go('/accounts');
+            case 'budget':
+              context.go('/budget');
+            case 'goals':
+              context.go('/goals');
+          }
+        });
+      });
+
+      // Start expense detection if enabled
+      _startExpenseDetectorIfEnabled();
+
+      // Start interactive tour for new users (after UI settles)
+      Future.delayed(const Duration(milliseconds: 900), _maybeStartTour);
     });
+  }
+
+  void _maybeStartTour() {
+    if (!mounted) return;
+    final tour = ref.read(interactiveTourProvider);
+    if (!tour.shouldRun) return;
+    InteractiveTourService.start(
+      context,
+      onFinish: () => ref.read(interactiveTourProvider).complete(),
+      onSkip: () => ref.read(interactiveTourProvider).skip(),
+    );
   }
 
   @override
@@ -95,6 +190,8 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
         if (!mounted) return;
         ref.invalidate(accountsStreamProvider);
         ref.invalidate(transactionsStreamProvider);
+        // Also refresh home screen widget data
+        ref.read(widgetServiceProvider).refresh();
       });
     }
   }
@@ -155,6 +252,20 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     }
   }
 
+  /// Starts listening for financial app notifications if the feature is enabled.
+  void _startExpenseDetectorIfEnabled() {
+    final enabled = ref.read(autoDetectExpensesProvider);
+    if (!enabled) return;
+
+    final detector = ref.read(expenseDetectorServiceProvider);
+    detector.start(
+      onExpenseDetected: (expense) {
+        // Store the detected expense for the UI to pick up
+        ref.read(detectedExpenseProvider.notifier).set(expense);
+      },
+    );
+  }
+
   @override
   void didUpdateWidget(AppShell oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -191,6 +302,12 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     if (tabId == 'more') {
       ref.read(notificationCenterProvider.notifier).markAllAsRead();
     }
+
+    // Mostrar mini-guía visual de la pantalla si aún no la vio
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showPageCoachIfNeeded(context, ref, tabId);
+    });
 
     // Sync with GoRouter for the 5 original branch tabs
     final branch = _tabToBranch[tabId];
@@ -259,7 +376,12 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
         if (standaloneWidget is! SizedBox) {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => standaloneWidget),
-          );
+          ).then((_) {});
+          // Mostrar mini-guía de la pantalla (una sola vez)
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            showPageCoachIfNeeded(context, ref, next);
+          });
         }
       }
     });
@@ -272,11 +394,25 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
       } else if (id == 'more') {
         badge = unreadAlerts;
       }
+      GlobalKey? tourKey;
+      switch (id) {
+        case 'home':
+          tourKey = TourKeys.navHome;
+        case 'transactions':
+          tourKey = TourKeys.navTransactions;
+        case 'budget':
+          tourKey = TourKeys.navBudget;
+        case 'goals':
+          tourKey = TourKeys.navGoals;
+        case 'more':
+          tourKey = TourKeys.navMore;
+      }
       return _TabItem(
         id: id,
         label: kTabInfo[id]!.label,
         icon: kTabInfo[id]!.icon,
         badgeCount: badge,
+        tourKey: tourKey,
       );
     }).toList();
 
@@ -379,7 +515,10 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
 
     return Scaffold(
       extendBody: true,
-      body: Stack(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Stack(
         children: [
           // ── PageView for swiping between tabs ──
           PageView(
@@ -395,6 +534,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
               left: 16,
               bottom: fabBottom,
               child: GestureDetector(
+                key: TourKeys.aiAssistantButton,
                 onTap: () => showAiAssistantSheet(context),
                 child: Container(
                   width: 48,
@@ -431,11 +571,14 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
                 curve: Curves.easeInOutCubicEmphasized,
                 child: IgnorePointer(
                   ignoring: fabAction == null,
-                  child: AppFab(
-                    icon: fabIcon ?? Icons.add_rounded,
-                    onPressed: fabAction ?? () {},
-                    onLongPress: fabLongPress,
-                    onDoubleTap: fabDoubleTap,
+                  child: KeyedSubtree(
+                    key: TourKeys.fab,
+                    child: AppFab(
+                      icon: fabIcon ?? Icons.add_rounded,
+                      onPressed: fabAction ?? () {},
+                      onLongPress: fabLongPress,
+                      onDoubleTap: fabDoubleTap,
+                    ),
                   ),
                 ),
               ),
@@ -460,6 +603,8 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
               ),
             ),
         ],
+      ),
+        ),
       ),
       bottomNavigationBar: Padding(
         padding: EdgeInsets.only(left: 16, right: 16, bottom: bottomPadding + 12),
@@ -765,6 +910,7 @@ class _NavItemState extends State<_NavItem>
   Widget build(BuildContext context) {
     final isSelected = widget.selected;
     return GestureDetector(
+      key: widget.tab.tourKey,
       onTapDown: _onTapDown,
       onTapUp: _onTapUp,
       onTapCancel: _onTapCancel,
@@ -883,10 +1029,12 @@ class _TabItem {
   final String label;
   final IconData icon;
   final int badgeCount;
+  final GlobalKey? tourKey;
   const _TabItem({
     required this.id,
     required this.label,
     required this.icon,
     this.badgeCount = 0,
+    this.tourKey,
   });
 }

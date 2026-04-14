@@ -25,11 +25,44 @@ class NovedadesPage extends StatelessWidget {
           _CurrentVersionBanner(),
           const SizedBox(height: 20),
 
+          // v1.7.0
+          _VersionCard(
+            version: 'v1.7.0',
+            date: '13 Abr 2026',
+            isCurrent: true,
+            items: const [
+              _ChangeItem(icon: Icons.widgets_rounded, text: 'Widget de pantalla de inicio: agregá gastos con voz o manual sin abrir la app', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.notifications_active_rounded, text: 'Detección de transferencias: detecta pagos de Mercado Pago, bancos y billeteras automáticamente', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.checklist_rounded, text: 'Check-in diario mejorado: el recordatorio ahora muestra cuánto gastaste hoy y botones de acción directa', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.school_rounded, text: 'Onboarding renovado: tutorial más conciso y claro en 6 pasos', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.phone_android_rounded, text: 'Soporte para tablets: la app se adapta mejor a pantallas grandes', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.link_off_rounded, text: 'Mercado Pago: se removió el input de API key manual (próximamente conexión automática)', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.cleaning_services_rounded, text: 'Fix: warnings de código limpiados (imports, null assertions)', type: _ChangeType.fix),
+            ],
+          ),
+
+          // v1.6.1
+          _VersionCard(
+            version: 'v1.6.1',
+            date: '9 Abr 2026',
+            isCurrent: false,
+            items: const [
+              _ChangeItem(icon: Icons.mic_rounded, text: 'Asistente de voz con IA: preguntale a Sencillo sobre tus finanzas (activalo en Ajustes > IA)', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.edit_rounded, text: 'Editor de cuentas unificado: ahora podés cambiar tipo, icono, color y todos los campos desde cualquier lugar', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.credit_card_rounded, text: 'Selector de tipo de cuenta: cambiá entre Efectivo, Debito, Credito, Ahorro e Inversion', type: _ChangeType.feature),
+              _ChangeItem(icon: Icons.shopping_cart_rounded, text: 'Fix: overflow del boton Comprar en Compras Inteligentes resuelto', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.build_rounded, text: 'Fix: error de compilacion Kotlin JVM target para plugins de Android', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.storefront_rounded, text: 'Branding Mercado Pago: la cuenta vinculada se detecta por nombre ademas de por ID', type: _ChangeType.improvement),
+              _ChangeItem(icon: Icons.visibility_off_rounded, text: 'Fix: pantalla negra al volver a la app desde segundo plano', type: _ChangeType.fix),
+              _ChangeItem(icon: Icons.history_rounded, text: 'Historial de precios manual en Compras Inteligentes: registra precios y ve la evolucion', type: _ChangeType.feature),
+            ],
+          ),
+
           // v1.6.0
           _VersionCard(
             version: 'v1.6.0',
             date: '7 Abr 2026',
-            isCurrent: true,
+            isCurrent: false,
             items: const [
               _ChangeItem(icon: Icons.bug_report_rounded, text: 'Fix crítico: eliminar gasto compartido ahora revierte correctamente el saldo de la persona', type: _ChangeType.fix),
               _ChangeItem(icon: Icons.sync_problem_rounded, text: 'Fix: eliminar transferencia ahora revierte el saldo de ambas cuentas (origen y destino)', type: _ChangeType.fix),
@@ -639,7 +672,7 @@ class _CurrentVersionBanner extends StatelessWidget {
                         border: Border.all(color: AppTheme.colorTransfer.withValues(alpha: 0.35)),
                       ),
                       child: Text(
-                        'v1.5.7',
+                        'v1.7.0',
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -652,7 +685,7 @@ class _CurrentVersionBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Versión actual · 6 de Abril 2026 · build 7',
+                  'Version actual · 13 de Abril 2026',
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     color: Colors.white38,

@@ -11,6 +11,7 @@ import '../../../../core/logic/transaction_service.dart';
 import '../../../transactions/domain/models/transaction.dart' as dom_tx;
 import '../../domain/models/account.dart' as dom;
 import '../widgets/edit_account_sheet.dart';
+import '../../../../core/widgets/page_coach.dart';
 
 class AccountDetailPage extends ConsumerWidget {
   final String accountId;
@@ -18,6 +19,9 @@ class AccountDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) showPageCoachIfNeeded(context, ref, 'account_detail');
+    });
     final accountsAsync = ref.watch(accountsStreamProvider);
     final transactionsAsync = ref.watch(transactionsStreamProvider);
 

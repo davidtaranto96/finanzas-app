@@ -25,6 +25,10 @@ const _kDailyReminderId = 3000;
 const _kWeeklySummaryId = 3001;
 const _kBudgetExceededBaseId = 4000;
 
+// Notification action IDs
+const kActionAddExpense = 'add_expense';
+const kActionDismiss = 'dismiss';
+
 // Prefs keys
 const _kNotifCardDueEnabled = 'notif_card_due_enabled';
 const _kNotifDebtRemindEnabled = 'notif_debt_remind_enabled';
@@ -182,6 +186,10 @@ class NotificationService {
   NotificationService(this._db);
 
   /// Initialize the notification plugin
+  /// Callback invoked when a notification action button is tapped.
+  /// Set by the app shell to navigate to the appropriate screen.
+  static void Function(String actionId)? onActionTapped;
+
   static Future<void> initialize() async {
     tz.initializeTimeZones();
 
@@ -198,6 +206,15 @@ class NotificationService {
         android: androidSettings,
         iOS: iosSettings,
       ),
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        final actionId = response.actionId;
+        if (actionId != null && actionId.isNotEmpty) {
+          onActionTapped?.call(actionId);
+        } else {
+          // Tapped the notification body → default to add expense
+          onActionTapped?.call(kActionAddExpense);
+        }
+      },
     );
 
     // Create notification channels on Android
@@ -236,6 +253,14 @@ class NotificationService {
             'Recordatorio diario',
             description: 'Recordatorio para registrar gastos del día',
             importance: Importance.defaultImportance,
+          ),
+        );
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'expense_detection',
+            'Gastos detectados',
+            description: 'Sugerencias de gasto desde notificaciones bancarias',
+            importance: Importance.high,
           ),
         );
         await androidPlugin.createNotificationChannel(
@@ -430,7 +455,8 @@ class NotificationService {
     );
   }
 
-  /// Schedule daily expense reminder at configured time
+  /// Schedule daily expense reminder at configured time with dynamic content.
+  /// Calculates today's spending summary and shows it in the notification.
   Future<void> scheduleDailyReminder({required int hour, required int minute}) async {
     await _plugin.cancel(_kDailyReminderId);
 
@@ -440,10 +466,13 @@ class NotificationService {
       scheduled = scheduled.add(const Duration(days: 1));
     }
 
+    // Calculate today's summary for dynamic content
+    final summary = await _getDailySummary();
+
     await _plugin.zonedSchedule(
       _kDailyReminderId,
-      '📝 Registrá tus gastos',
-      'No olvides anotar los gastos de hoy',
+      summary.title,
+      summary.body,
       scheduled,
       NotificationDetails(
         android: AndroidNotificationDetails(
@@ -452,12 +481,53 @@ class NotificationService {
           icon: '@mipmap/ic_launcher',
           importance: Importance.defaultImportance,
           color: const Color(0xFF6C63FF),
+          actions: const [
+            AndroidNotificationAction(
+              kActionAddExpense,
+              'Agregar gasto',
+              showsUserInterface: true,
+            ),
+            AndroidNotificationAction(
+              kActionDismiss,
+              'Todo listo',
+              cancelNotification: true,
+            ),
+          ],
         ),
         iOS: const DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
+    );
+  }
+
+  /// Calculate today's expense summary for the daily reminder notification.
+  Future<({String title, String body})> _getDailySummary() async {
+    final today = DateTime.now();
+    final startOfDay = DateTime(today.year, today.month, today.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final allExpenses = await (_db.select(_db.transactionsTable)
+          ..where((t) => t.type.equals('expense')))
+        .get();
+    final rows = allExpenses.where((t) =>
+        !t.date.isBefore(startOfDay) && t.date.isBefore(endOfDay)).toList();
+
+    if (rows.isEmpty) {
+      return (
+        title: 'No registraste gastos hoy',
+        body: '¿Día sin gastos o te olvidaste de anotar algo?',
+      );
+    }
+
+    final total = rows.fold(0.0, (sum, t) => sum + t.amount);
+    final count = rows.length;
+    final formatted = total.toStringAsFixed(total.truncateToDouble() == total ? 0 : 2);
+
+    return (
+      title: 'Hoy: \$$formatted en $count gasto${count == 1 ? '' : 's'}',
+      body: '¿Te falta anotar algún gasto del día?',
     );
   }
 

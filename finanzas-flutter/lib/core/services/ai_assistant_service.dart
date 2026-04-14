@@ -50,7 +50,7 @@ class AiAssistantService {
     // Top categories this month
     final catSpend = <String, double>{};
     for (final t in monthTx.where((t) => t.type == TransactionType.expense)) {
-      catSpend[t.categoryId ?? 'otro'] = (catSpend[t.categoryId ?? 'otro'] ?? 0) + t.amount;
+      catSpend[t.categoryId] = (catSpend[t.categoryId] ?? 0) + t.amount;
     }
     if (catSpend.isNotEmpty) {
       final sorted = catSpend.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
@@ -74,7 +74,7 @@ class AiAssistantService {
     if (budgets.isNotEmpty) {
       buf.writeln('\nPRESUPUESTOS:');
       for (final b in budgets) {
-        buf.writeln('- ${b.categoryName ?? b.categoryId}: \$${b.spentAmount.toStringAsFixed(0)} / \$${b.limitAmount.toStringAsFixed(0)}');
+        buf.writeln('- ${b.categoryName}: \$${b.spentAmount.toStringAsFixed(0)} / \$${b.limitAmount.toStringAsFixed(0)}');
       }
     }
 
@@ -90,7 +90,7 @@ class AiAssistantService {
     buf.writeln('\nÚLTIMOS 10 MOVIMIENTOS:');
     for (final t in recentTx.take(10)) {
       final sign = t.type == TransactionType.income ? '+' : '-';
-      buf.writeln('- ${t.date.day}/${t.date.month}: $sign\$${t.amount.toStringAsFixed(0)} ${t.title} (${t.categoryId ?? ""})');
+      buf.writeln('- ${t.date.day}/${t.date.month}: $sign\$${t.amount.toStringAsFixed(0)} ${t.title} (${t.categoryId})');
     }
 
     return buf.toString();

@@ -15,6 +15,7 @@ import '../../../transactions/domain/models/transaction.dart' as dom_tx;
 import '../../../transactions/presentation/pages/transaction_detail_page.dart';
 import '../../../accounts/domain/models/account.dart' as dom_a;
 import 'add_expense_page.dart';
+import '../../../../core/widgets/page_coach.dart';
 
 class PersonDetailPage extends ConsumerStatefulWidget {
   final Person person;
@@ -25,6 +26,14 @@ class PersonDetailPage extends ConsumerStatefulWidget {
 }
 
 class _PersonDetailPageState extends ConsumerState<PersonDetailPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) showPageCoachIfNeeded(context, ref, 'person_detail');
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // Re-watch person for live updates

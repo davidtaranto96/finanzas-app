@@ -17,16 +17,6 @@ class MercadoPagoPage extends ConsumerStatefulWidget {
 }
 
 class _MercadoPagoPageState extends ConsumerState<MercadoPagoPage> {
-  final _tokenController = TextEditingController();
-  bool _isConnecting = false;
-  bool _showToken = false;
-
-  @override
-  void dispose() {
-    _tokenController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final isConnected = ref.watch(mpConnectedProvider);
@@ -57,13 +47,13 @@ class _MercadoPagoPageState extends ConsumerState<MercadoPagoPage> {
     );
   }
 
-  // ─── Formulario de conexión ────────────────────────────────────────────────
+  // ─── Pantalla de próximamente (sin API key input) ──────────────────────────
 
   Widget _buildConnectForm() {
-    final cs = Theme.of(context).colorScheme;
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        const SizedBox(height: 40),
         // Header
         Container(
           padding: const EdgeInsets.all(24),
@@ -79,10 +69,10 @@ class _MercadoPagoPageState extends ConsumerState<MercadoPagoPage> {
                   color: Colors.white, size: 48),
               const SizedBox(height: 12),
               Text(
-                'Conectá tu Mercado Pago',
+                'Mercado Pago',
                 style: GoogleFonts.inter(
                   color: Colors.white,
-                  fontSize: 20,
+                  fontSize: 22,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -99,195 +89,53 @@ class _MercadoPagoPageState extends ConsumerState<MercadoPagoPage> {
           ),
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
 
-        // Instrucciones
+        // Próximamente card
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+            color: const Color(0xFF009EE3).withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: const Color(0xFF009EE3).withValues(alpha: 0.2)),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Cómo obtener tu Access Token:',
-                style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600, fontSize: 15),
-              ),
-              const SizedBox(height: 12),
-              _StepItem(number: '1', text: 'Entrá a developers.mercadopago.com.ar'),
-              _StepItem(number: '2', text: 'Andá a Tu aplicación → Credenciales de producción'),
-              _StepItem(number: '3', text: 'Copiá el Access Token'),
-              _StepItem(number: '4', text: 'Pegalo acá abajo'),
-              const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.colorWarning.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0xFF009EE3).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.lock_rounded,
-                        color: AppTheme.colorWarning, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Tu token se guarda solo en tu celular. No se comparte con nadie.',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: AppTheme.colorWarning,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
+                child: const Icon(Icons.construction_rounded,
+                    color: Color(0xFF009EE3), size: 32),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Conexión automática',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 17,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Estamos trabajando en una forma más simple y segura de conectar tu cuenta de Mercado Pago.\n\n'
+                'Muy pronto vas a poder sincronizar tus movimientos con un solo toque.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: Colors.white60,
+                  height: 1.5,
                 ),
               ),
             ],
           ),
         ),
-
-        const SizedBox(height: 20),
-
-        // Input de token
-        TextField(
-          controller: _tokenController,
-          obscureText: !_showToken,
-          style: GoogleFonts.jetBrainsMono(fontSize: 13),
-          decoration: InputDecoration(
-            labelText: 'Access Token',
-            hintText: 'APP_USR-...',
-            prefixIcon: const Icon(Icons.key_rounded),
-            suffixIcon: IconButton(
-              icon: Icon(
-                  _showToken ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _showToken = !_showToken),
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 20),
-
-        // Botón conectar
-        FilledButton.icon(
-          onPressed: _isConnecting ? null : _connect,
-          icon: _isConnecting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
-              : const Icon(Icons.link_rounded),
-          label: Text(
-            _isConnecting ? 'Conectando...' : 'Conectar Mercado Pago',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-          ),
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF009EE3),
-            minimumSize: const Size(double.infinity, 52),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
       ],
     );
-  }
-
-  Future<void> _connect() async {
-    final token = _tokenController.text.trim();
-    if (token.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pegá tu Access Token')),
-      );
-      return;
-    }
-
-    setState(() => _isConnecting = true);
-    try {
-      final profile = await connectMercadoPago(token);
-      ref.invalidate(mpConnectedProvider);
-      ref.invalidate(mpProfileProvider);
-      ref.invalidate(mpBalanceProvider);
-      ref.invalidate(mpMovementsProvider);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('¡Conectado como ${profile.displayName}!'),
-            backgroundColor: const Color(0xFF5ECFB1),
-          ),
-        );
-        // Ofrecer importar movimientos
-        _showImportDialog();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Token inválido o error: $e'),
-            backgroundColor: AppTheme.colorExpense,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isConnecting = false);
-    }
-  }
-
-  /// Dialog post-conexión para importar movimientos
-  Future<void> _showImportDialog() async {
-    if (!mounted) return;
-    final shouldImport = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E2C),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            const Icon(Icons.sync_rounded, color: Color(0xFF009EE3), size: 24),
-            const SizedBox(width: 10),
-            Text('Importar movimientos',
-                style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 17)),
-          ],
-        ),
-        content: Text(
-          '¿Querés importar tus movimientos recientes de Mercado Pago como transacciones en Sencillo?\n\n'
-          'Se categorizarán automáticamente con IA y se sincronizará tu saldo.',
-          style: GoogleFonts.inter(color: Colors.white70, fontSize: 14, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Después',
-                style: GoogleFonts.inter(color: Colors.white54)),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(ctx, true),
-            icon: const Icon(Icons.download_rounded, size: 18),
-            label: Text('Importar',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF009EE3),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (shouldImport == true && mounted) {
-      _runSync(firstSync: true);
-    }
   }
 
   /// Ejecuta la sincronización con feedback visual
@@ -538,44 +386,6 @@ class _MercadoPagoPageState extends ConsumerState<MercadoPagoPage> {
 }
 
 // ─── Sub-widgets ──────────────────────────────────────────────────────────────
-
-class _StepItem extends StatelessWidget {
-  final String number;
-  final String text;
-  const _StepItem({required this.number, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 22,
-            height: 22,
-            decoration: const BoxDecoration(
-              color: Color(0xFF009EE3),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(number,
-                  style: GoogleFonts.inter(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700)),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(text,
-                style: GoogleFonts.inter(fontSize: 13, height: 1.4)),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _ProfileCard extends StatelessWidget {
   final MpUserProfile profile;

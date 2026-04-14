@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/widgets/tour_keys.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_providers.dart';
@@ -26,6 +27,7 @@ import '../../../../core/providers/account_order_provider.dart';
 import '../../../accounts/domain/models/account.dart';
 import '../../../../core/providers/alerts_provider.dart';
 import '../../../../core/providers/home_widgets_provider.dart';
+import '../../../../core/services/daily_tip_service.dart';
 import '../../../../core/widgets/home_widget_config_sheet.dart';
 import '../../../../core/widgets/select_sheets.dart';
 import '../../../../core/providers/currency_provider.dart';
@@ -67,6 +69,7 @@ class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClie
     required double safeBudget,
     required double arsCash,
     required double pendingCards,
+    required double totalCardDebt,
     required double totalSavedInGoals,
     required List<dom_tx.Transaction> transactions,
     required List<Account> accounts,
@@ -81,11 +84,14 @@ class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClie
     final widgetMap = <String, List<Widget>>{
       'balance': [
         const SizedBox(height: 6),
+        const _DailyTipBanner(),
         BalanceHeroCard(
+          key: TourKeys.balanceCard,
           balance: monthlyStats,
           safeBudget: safeBudget,
           arsCash: arsCash,
           pendingCards: pendingCards,
+          totalCardDebt: totalCardDebt,
           totalSavedInGoals: totalSavedInGoals,
           onSavingsTap: () => context.push('/savings'),
           onIncomeTap: () {
@@ -318,6 +324,10 @@ class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClie
             final pendingCards = accounts
                 .where((a) => a.isCreditCard)
                 .fold(0.0, (sum, a) => sum + a.pendingStatementAmount);
+            // Total card debt = current period spending + pending statements
+            final totalCardDebt = accounts
+                .where((a) => a.isCreditCard)
+                .fold(0.0, (sum, a) => sum + a.totalDebt);
             final safeBudget = arsCash + foreignCashArs - pendingCards;
             
             // Calculate real MonthlyBalance for widgets
@@ -421,6 +431,7 @@ class _HomePageState extends ConsumerState<HomePage> with AutomaticKeepAliveClie
                               safeBudget: safeBudget,
                               arsCash: arsCash,
                               pendingCards: pendingCards,
+                              totalCardDebt: totalCardDebt,
                               totalSavedInGoals: totalSavedInGoals,
                               transactions: transactions,
                               accounts: accounts,
@@ -1079,6 +1090,81 @@ class _CollapsibleTransactionsState extends State<_CollapsibleTransactions> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// B8: Banner dismissible con el tip del día.
+/// Si el usuario lo descartó hoy, no se renderiza (SizedBox.shrink).
+class _DailyTipBanner extends ConsumerWidget {
+  const _DailyTipBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tipAsync = ref.watch(dailyTipProvider);
+    return tipAsync.when(
+      data: (tip) {
+        if (tip == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6C63FF).withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFF6C63FF).withValues(alpha: 0.28),
+                width: 0.8,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tip.emoji, style: const TextStyle(fontSize: 22)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tip.title,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        tip.body,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: Colors.white.withValues(alpha: 0.72),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                      minWidth: 32, minHeight: 32),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: Colors.white.withValues(alpha: 0.5),
+                  ),
+                  onPressed: () => dismissTodaysTip(ref),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 }

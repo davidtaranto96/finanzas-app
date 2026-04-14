@@ -11,6 +11,7 @@ import '../../../../core/logic/people_service.dart';
 import '../../domain/models/transaction.dart';
 import '../../../accounts/domain/models/account.dart' as dom_acc;
 import '../widgets/add_transaction_bottom_sheet.dart' show kCategoryIcons, kCategoryEmojis;
+import '../../../../core/widgets/page_coach.dart';
 
 class TransactionDetailPage extends ConsumerWidget {
   final String txId;
@@ -18,6 +19,9 @@ class TransactionDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) showPageCoachIfNeeded(context, ref, 'transaction_detail');
+    });
     final txAsync = ref.watch(transactionsStreamProvider);
     final accountsAsync = ref.watch(accountsStreamProvider);
     final categories = ref.watch(categoriesStreamProvider).valueOrNull ?? [];

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Widget Agregar — 1x1, cuadrado, NO resizable.
+  Muestra el círculo violeta branded con "Agregar / gasto".
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:initialLayout="@layout/quick_expense_widget"
+    android:previewLayout="@layout/quick_expense_widget"
+    android:previewImage="@drawable/widget_preview_add"
+    android:minWidth="60dp"
+    android:minHeight="60dp"
+    android:targetCellWidth="1"
+    android:targetCellHeight="1"
+    android:resizeMode="none"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_quick_description" />

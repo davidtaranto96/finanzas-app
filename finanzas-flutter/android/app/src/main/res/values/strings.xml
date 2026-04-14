@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_description">Registrá gastos rápido con voz o manual</string>
+    <string name="widget_info_description">Gastos del mes y acceso rápido para agregar</string>
+    <string name="widget_quick_description">Botón rápido para cargar un gasto</string>
+    <string name="widget_dollar_description">Cotización del dólar en vivo</string>
+    <string name="widget_crypto_description">Cotización cripto en vivo</string>
+    <string name="widget_stocks_description">Cotización de acciones en vivo</string>
+</resources>

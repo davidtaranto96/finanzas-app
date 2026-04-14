@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sencillo - Bienvenida Demo v1.7.0</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #f8f9fa;
+    color: #1a1a2e;
+    line-height: 1.7;
+    padding: 40px;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  /* ── Print / PDF styles ── */
+  @media print {
+    body { padding: 15px; background: white; max-width: 100%; }
+    .no-print { display: none !important; }
+    .page-break { page-break-before: always; }
+    .no-break { page-break-inside: avoid; break-inside: avoid; }
+    .screenshots-row { page-break-inside: avoid; break-inside: avoid; }
+    .screen-mock { page-break-inside: avoid; break-inside: avoid; }
+    h2 { page-break-after: avoid; break-after: avoid; }
+    h3 { page-break-after: avoid; break-after: avoid; }
+    table { page-break-inside: avoid; break-inside: avoid; }
+    .problem-box, .solution-box, .tip { page-break-inside: avoid; break-inside: avoid; }
+    .checklist { page-break-inside: avoid; break-inside: avoid; }
+  }
+
+  .header {
+    text-align: center;
+    padding: 48px 20px;
+    background: linear-gradient(135deg, #6C63FF 0%, #5ECFB1 100%);
+    border-radius: 20px;
+    color: white;
+    margin-bottom: 32px;
+  }
+  .header h1 { font-size: 42px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.5px; }
+  .header p { font-size: 17px; opacity: 0.9; }
+  .header .version {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 12px;
+  }
+  h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 32px 0 12px;
+    color: #6C63FF;
+    border-bottom: 2px solid #6C63FF20;
+    padding-bottom: 6px;
+  }
+  h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 20px 0 8px;
+    color: #333;
+  }
+  p { margin-bottom: 12px; font-size: 15px; }
+  ul, ol { margin: 8px 0 16px 20px; }
+  li { margin-bottom: 6px; font-size: 15px; }
+  .problem-box {
+    background: linear-gradient(135deg, #FF6B6B15, #FF8C6910);
+    border-left: 4px solid #FF6B6B;
+    padding: 20px;
+    border-radius: 0 12px 12px 0;
+    margin: 16px 0;
+  }
+  .solution-box {
+    background: linear-gradient(135deg, #5ECFB115, #4ECDC410);
+    border-left: 4px solid #5ECFB1;
+    padding: 20px;
+    border-radius: 0 12px 12px 0;
+    margin: 16px 0;
+  }
+  .tip {
+    background: #6C63FF10;
+    border: 1px solid #6C63FF30;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    margin: 12px 0;
+  }
+  .tip strong { color: #6C63FF; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  th {
+    background: #6C63FF;
+    color: white;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #eee;
+  }
+  tr:nth-child(even) td { background: #f8f8fc; }
+  .checklist { list-style: none; margin-left: 0; }
+  .checklist li {
+    padding: 8px 0 8px 28px;
+    position: relative;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .checklist li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10px;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #6C63FF;
+    border-radius: 4px;
+  }
+  .step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #6C63FF;
+    color: white;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 14px;
+    margin-right: 8px;
+  }
+  .footer {
+    text-align: center;
+    padding: 24px;
+    margin-top: 32px;
+    color: #999;
+    font-size: 13px;
+    border-top: 1px solid #eee;
+  }
+  .print-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #6C63FF;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(108,99,255,0.3);
+    z-index: 100;
+  }
+  .print-btn:hover { background: #5a52e0; }
+
+  /* ── Screenshot mockups ── */
+  .screenshots-row {
+    display: flex;
+    gap: 14px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .screen-wrap {
+    flex-shrink: 0;
+    text-align: center;
+  }
+  .screen-mock {
+    width: 190px;
+    border-radius: 20px;
+    background: #0D0D15;
+    overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+  }
+  .screen-mock .sb { height: 22px; background: #0D0D15; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 9px; color: #888; }
+  .screen-mock .sc { padding: 12px; min-height: 280px; display: flex; flex-direction: column; }
+  .screen-mock .st { font-size: 15px; font-weight: 800; color: white; margin-bottom: 10px; }
+  .screen-mock .ss { font-size: 10px; color: #888; margin-bottom: 6px; }
+  .mc { background: #1A1A28; border-radius: 10px; padding: 9px 10px; margin-bottom: 6px; }
+  .mc .cl { font-size: 8px; color: #6C63FF; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .mc .cv { font-size: 16px; font-weight: 800; color: white; margin-top: 1px; }
+  .mc .cs { font-size: 8px; color: #5ECFB1; margin-top: 1px; }
+  .mr { display: flex; align-items: center; padding: 6px 0; border-bottom: 1px solid #ffffff08; }
+  .mr .ri { width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; margin-right: 7px; flex-shrink: 0; }
+  .mr .rt { flex: 1; }
+  .mr .rn { font-size: 10px; color: white; font-weight: 600; }
+  .mr .rs { font-size: 8px; color: #666; }
+  .mr .ra { font-size: 10px; font-weight: 700; color: #FF6B6B; }
+  .mr .ra.g { color: #5ECFB1; }
+  .mp { height: 5px; background: #1A1A28; border-radius: 3px; margin: 5px 0; overflow: hidden; }
+  .mp .f { height: 100%; border-radius: 3px; }
+  .mn { display: flex; justify-content: space-around; padding: 7px 0; margin-top: auto; border-top: 1px solid #ffffff08; font-size: 7px; color: #555; }
+  .mn .a { color: #6C63FF; }
+  .mf { width: 32px; height: 32px; background: linear-gradient(135deg, #6C63FF, #5ECFB1); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; font-weight: 300; position: absolute; bottom: 44px; right: 12px; box-shadow: 0 3px 10px rgba(108,99,255,0.4); }
+  .sl { text-align: center; font-size: 11px; font-weight: 600; color: #6C63FF; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">Guardar como PDF</button>
+
+<div class="header">
+  <h1>Sencillo</h1>
+  <p>Tu app de finanzas personales, simple y sin vueltas</p>
+  <div class="version">Demo v1.7.0 &mdash; Abril 2026</div>
+</div>
+
+<!-- ────────── QUE ES ────────── -->
+
+<div class="no-break">
+<h2>Que es Sencillo?</h2>
+<p><strong>Sencillo</strong> es una app de finanzas personales pensada para que controlar tu plata sea rapido, simple y sin vueltas. No necesitas ser contador ni experto en finanzas. Solo abrila, carga tus gastos, y Sencillo se encarga del resto.</p>
+</div>
+
+<div class="no-break">
+<h2>El problema</h2>
+<div class="problem-box">
+  <p><strong>La mayoria de las personas no sabe exactamente en que gasta su plata.</strong> A fin de mes miras la cuenta y no entendes donde fue todo. Las apps de finanzas que existen son complicadas, piden demasiados datos, o no estan pensadas para Argentina.</p>
+</div>
+
+<div class="solution-box">
+  <p><strong>Sencillo te ayuda a:</strong></p>
+  <ul>
+    <li>Saber exactamente cuanto gastas y en que</li>
+    <li>Poner limites de gasto por categoria (presupuestos)</li>
+    <li>Ahorrar con metas claras y seguir tu progreso</li>
+    <li>Dividir gastos con amigos sin discusiones</li>
+    <li>Ver tu situacion financiera de un vistazo</li>
+  </ul>
+</div>
+</div>
+
+<!-- ────────── PANTALLAS ────────── -->
+
+<div class="page-break"></div>
+
+<h2>Asi se ve Sencillo</h2>
+<p>Estas son las pantallas principales de la app:</p>
+
+<div class="screenshots-row">
+  <!-- Dashboard -->
+  <div class="screen-wrap">
+    <div class="screen-mock">
+      <div class="sb"><span>9:41</span><span>100%</span></div>
+      <div class="sc" style="position:relative;">
+        <div class="st">Hola, David</div>
+        <div class="mc"><div class="cl">Balance total</div><div class="cv">$284.500</div><div class="cs">+$12.000 vs mes pasado</div></div>
+        <div class="mc" style="background:linear-gradient(135deg,#6C63FF22,#5ECFB122);"><div class="cl">Gastos del mes</div><div class="cv" style="font-size:14px;">$87.200</div></div>
+        <div class="mr"><div class="ri" style="background:#FF6B6B22;">&#127828;</div><div class="rt"><div class="rn">Almuerzo</div><div class="rs">Hoy 13:20</div></div><div class="ra">-$4.500</div></div>
+        <div class="mr"><div class="ri" style="background:#6C63FF22;">&#128652;</div><div class="rt"><div class="rn">SUBE</div><div class="rs">Hoy 08:15</div></div><div class="ra">-$650</div></div>
+        <div class="mr"><div class="ri" style="background:#5ECFB122;">&#128176;</div><div class="rt"><div class="rn">Sueldo</div><div class="rs">Ayer</div></div><div class="ra g">+$350.000</div></div>
+        <div class="mf">+</div>
+        <div class="mn"><span class="a">Inicio</span><span>Movimientos</span><span>Presupuestos</span><span>Metas</span><span>Mas</span></div>
+      </div>
+    </div>
+    <div class="sl">Dashboard</div>
+  </div>
+
+  <!-- Movimientos -->
+  <div class="screen-wrap">
+    <div class="screen-mock">
+      <div class="sb"><span>9:41</span><span>100%</span></div>
+      <div class="sc">
+        <div class="st">Movimientos</div>
+        <div class="ss">ABRIL 2026</div>
+        <div class="mr"><div class="ri" style="background:#FF6B6B22;">&#127828;</div><div class="rt"><div class="rn">Almuerzo oficina</div><div class="rs">Comida &middot; Efectivo</div></div><div class="ra">-$4.500</div></div>
+        <div class="mr"><div class="ri" style="background:#FFB84D22;">&#9917;</div><div class="rt"><div class="rn">Futbol 5</div><div class="rs">Entretenimiento &middot; MP</div></div><div class="ra">-$6.000</div></div>
+        <div class="mr"><div class="ri" style="background:#6C63FF22;">&#128652;</div><div class="rt"><div class="rn">SUBE</div><div class="rs">Transporte &middot; Efectivo</div></div><div class="ra">-$650</div></div>
+        <div class="mr"><div class="ri" style="background:#5ECFB122;">&#128176;</div><div class="rt"><div class="rn">Sueldo abril</div><div class="rs">Ingreso &middot; Banco</div></div><div class="ra g">+$350.000</div></div>
+        <div class="mr"><div class="ri" style="background:#E91E6322;">&#128156;</div><div class="rt"><div class="rn">Farmacia</div><div class="rs">Salud &middot; Debito</div></div><div class="ra">-$8.200</div></div>
+        <div class="mr"><div class="ri" style="background:#FF6B6B22;">&#127829;</div><div class="rt"><div class="rn">Supermercado</div><div class="rs">Comida &middot; Credito</div></div><div class="ra">-$22.300</div></div>
+        <div class="mn"><span>Inicio</span><span class="a">Movimientos</span><span>Presupuestos</span><span>Metas</span><span>Mas</span></div>
+      </div>
+    </div>
+    <div class="sl">Movimientos</div>
+  </div>
+
+  <!-- Presupuestos -->
+  <div class="screen-wrap">
+    <div class="screen-mock">
+      <div class="sb"><span>9:41</span><span>100%</span></div>
+      <div class="sc">
+        <div class="st">Presupuestos</div>
+        <div class="ss">ABRIL 2026</div>
+        <div class="mc">
+          <div class="cl">Comida</div>
+          <div class="cv" style="font-size:13px;">$45.000 <span style="font-size:9px;color:#888;font-weight:400;">/ $60.000</span></div>
+          <div class="mp"><div class="f" style="width:75%;background:linear-gradient(90deg,#6C63FF,#FFB84D);"></div></div>
+          <div style="font-size:8px;color:#FFB84D;">75% &mdash; Quedan $15.000</div>
+        </div>
+        <div class="mc">
+          <div class="cl">Transporte</div>
+          <div class="cv" style="font-size:13px;">$8.200 <span style="font-size:9px;color:#888;font-weight:400;">/ $15.000</span></div>
+          <div class="mp"><div class="f" style="width:55%;background:linear-gradient(90deg,#5ECFB1,#6C63FF);"></div></div>
+          <div style="font-size:8px;color:#5ECFB1;">55% &mdash; Vas bien</div>
+        </div>
+        <div class="mc">
+          <div class="cl">Entretenimiento</div>
+          <div class="cv" style="font-size:13px;">$18.000 <span style="font-size:9px;color:#888;font-weight:400;">/ $15.000</span></div>
+          <div class="mp"><div class="f" style="width:100%;background:linear-gradient(90deg,#FF6B6B,#FF8E53);"></div></div>
+          <div style="font-size:8px;color:#FF6B6B;">120% &mdash; Te pasaste $3.000</div>
+        </div>
+        <div class="mn"><span>Inicio</span><span>Movimientos</span><span class="a">Presupuestos</span><span>Metas</span><span>Mas</span></div>
+      </div>
+    </div>
+    <div class="sl">Presupuestos</div>
+  </div>
+</div>
+
+<!-- Segunda fila -->
+<div class="screenshots-row">
+  <!-- Metas -->
+  <div class="screen-wrap">
+    <div class="screen-mock">
+      <div class="sb"><span>9:41</span><span>100%</span></div>
+      <div class="sc">
+        <div class="st">Metas</div>
+        <div class="mc" style="border-left:3px solid #5ECFB1;">
+          <div class="cl" style="color:#5ECFB1;">Viaje a Europa</div>
+          <div class="cv" style="font-size:13px;">$280.000 <span style="font-size:9px;color:#888;font-weight:400;">/ $500.000</span></div>
+          <div class="mp"><div class="f" style="width:56%;background:linear-gradient(90deg,#5ECFB1,#6C63FF);"></div></div>
+          <div style="font-size:8px;color:#5ECFB1;">56% &mdash; Segui asi!</div>
+        </div>
+        <div class="mc" style="border-left:3px solid #6C63FF;">
+          <div class="cl">Notebook nueva</div>
+          <div class="cv" style="font-size:13px;">$150.000 <span style="font-size:9px;color:#888;font-weight:400;">/ $400.000</span></div>
+          <div class="mp"><div class="f" style="width:37%;background:linear-gradient(90deg,#6C63FF,#9D8CFF);"></div></div>
+          <div style="font-size:8px;color:#888;">37%</div>
+        </div>
+        <div class="mn"><span>Inicio</span><span>Movimientos</span><span>Presupuestos</span><span class="a">Metas</span><span>Mas</span></div>
+      </div>
+    </div>
+    <div class="sl">Metas de ahorro</div>
+  </div>
+
+  <!-- Personas -->
+  <div class="screen-wrap">
+    <div class="screen-mock">
+      <div class="sb"><span>9:41</span><span>100%</span></div>
+      <div class="sc">
+        <div class="st">Personas</div>
+        <div class="mr"><div class="ri" style="background:#6C63FF33;color:white;font-size:10px;font-weight:700;">JM</div><div class="rt"><div class="rn">Juan Martin</div><div class="rs">3 gastos compartidos</div></div><div class="ra g">Te debe $4.200</div></div>
+        <div class="mr"><div class="ri" style="background:#FF6B6B33;color:white;font-size:10px;font-weight:700;">SL</div><div class="rt"><div class="rn">Sofia Lopez</div><div class="rs">1 gasto compartido</div></div><div class="ra">Le debes $1.500</div></div>
+        <div class="mr"><div class="ri" style="background:#5ECFB133;color:white;font-size:10px;font-weight:700;">MC</div><div class="rt"><div class="rn">Martin Cruz</div><div class="rs">5 gastos compartidos</div></div><div class="ra" style="color:#888;">Al dia</div></div>
+        <div style="margin-top:14px;">
+          <div class="mc" style="background:linear-gradient(135deg,#6C63FF15,#5ECFB115);border:1px solid #6C63FF22;">
+            <div style="font-size:9px;color:white;text-align:center;">Vincular amigo &mdash; Escanea su QR</div>
+          </div>
+        </div>
+        <div class="mn"><span>Inicio</span><span>Movimientos</span><span>Presupuestos</span><span>Metas</span><span class="a">Mas</span></div>
+      </div>
+    </div>
+    <div class="sl">Gastos compartidos</div>
+  </div>
+
+  <!-- Widgets -->
+  <div class="screen-wrap">
+    <div class="screen-mock">
+      <div class="sb"><span>9:41</span><span>100%</span></div>
+      <div class="sc" style="background:#1a1a2e;justify-content:center;align-items:center;">
+        <div class="ss" style="color:#888;margin-bottom:16px;">PANTALLA DE INICIO</div>
+        <!-- Widget alargado -->
+        <div style="background:rgba(255,255,255,0.06);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,0.08);width:100%;margin-bottom:10px;">
+          <div style="flex:1;">
+            <div style="font-size:7px;color:#aaa;">Sencillo</div>
+            <div style="font-size:16px;font-weight:800;color:white;">$87.2K</div>
+            <div style="font-size:7px;color:#888;">23 gastos este mes</div>
+          </div>
+          <div style="width:30px;height:30px;background:#6C63FF;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;color:white;">+</div>
+        </div>
+        <!-- Widget 1x1 -->
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:10px;border:1px solid rgba(255,255,255,0.08);text-align:center;">
+            <div style="width:28px;height:28px;background:#6C63FF;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;color:white;margin:0 auto;">+</div>
+            <div style="font-size:7px;color:#aaa;margin-top:3px;">Gasto</div>
+          </div>
+          <div style="font-size:8px;color:#666;line-height:1.4;">Widget 1x1<br>Acceso rapido</div>
+        </div>
+        <div style="font-size:8px;color:#555;margin-top:14px;text-align:center;">2 widgets disponibles</div>
+      </div>
+    </div>
+    <div class="sl">Widgets de inicio</div>
+  </div>
+</div>
+
+<!-- ────────── GUIA RAPIDA ────────── -->
+
+<div class="page-break"></div>
+
+<h2>Guia rapida</h2>
+
+<div class="no-break">
+<h3><span class="step-number">1</span> Tu primera cuenta</h3>
+<p>Al entrar ya tenes una cuenta "Efectivo" creada. Para agregar mas (banco, tarjeta, MP):</p>
+<ul>
+  <li>Anda a <strong>Mas</strong> > <strong>Administrar cuentas</strong></li>
+  <li>Toca el <strong>+</strong> para agregar una nueva</li>
+  <li>Elegi el tipo: Efectivo, Debito, Credito, Ahorro o Inversion</li>
+</ul>
+</div>
+
+<div class="no-break">
+<h3><span class="step-number">2</span> Registrar un gasto</h3>
+<p>Cada vez que gastas plata:</p>
+<ul>
+  <li>Toca el boton <strong>+ violeta</strong> (abajo a la derecha)</li>
+  <li>Ingresa el monto, titulo y categoria</li>
+  <li>Elegi la cuenta desde la que pagas</li>
+</ul>
+<div class="tip"><strong>Tip:</strong> Usa el widget de pantalla de inicio para cargar gastos sin abrir la app. Mantene presionado el fondo del celular > Widgets > Sencillo.</div>
+<div class="tip"><strong>Tip:</strong> Mantene presionado el boton + violeta para activar el asistente de voz y dictar tu gasto hablando.</div>
+</div>
+
+<div class="no-break">
+<h3><span class="step-number">3</span> Presupuestos</h3>
+<p>Pone limites de gasto mensuales:</p>
+<ul>
+  <li>Anda a la pestana <strong>Presupuestos</strong></li>
+  <li>Crea uno con categoria y monto limite</li>
+  <li>La app te avisa cuando estes por pasarte</li>
+</ul>
+</div>
+
+<div class="no-break">
+<h3><span class="step-number">4</span> Metas de ahorro</h3>
+<ul>
+  <li>Anda a la pestana <strong>Metas</strong></li>
+  <li>Crea una meta (ej: "Viaje a Europa", $500.000)</li>
+  <li>Agrega aportes y ve tu progreso visual</li>
+</ul>
+</div>
+
+<div class="no-break">
+<h3><span class="step-number">5</span> Gastos compartidos</h3>
+<ul>
+  <li>Anda a <strong>Mas</strong> > <strong>Personas</strong> y agrega a la persona</li>
+  <li>Al cargar un gasto, activa "Compartido" y elegi con quien</li>
+  <li>La app calcula automaticamente quien debe cuanto</li>
+</ul>
+<div class="tip"><strong>Vincular amigos:</strong> Si tu amigo usa Sencillo, vinculalo escaneando su QR desde Personas > Vincular amigo. Los gastos compartidos se sincronizan entre ambos.</div>
+</div>
+
+<div class="no-break">
+<h3><span class="step-number">6</span> Compras inteligentes</h3>
+<ul>
+  <li>Anda a <strong>Mas</strong> > <strong>Compras inteligentes</strong></li>
+  <li>Agrega items con precio y prioridad</li>
+  <li>Cuando compras, toca "Comprar" y se registra como gasto</li>
+</ul>
+</div>
+
+<!-- ────────── NOVEDADES ────────── -->
+
+<div class="page-break"></div>
+
+<div class="no-break">
+<h2>Novedades v1.7.0</h2>
+<table>
+  <tr><th>Funcion</th><th>Descripcion</th></tr>
+  <tr><td><strong>Widgets de inicio</strong></td><td>2 widgets: uno alargado con info de gastos + boton, y uno cuadrado de acceso rapido</td></tr>
+  <tr><td><strong>Deteccion de transferencias</strong></td><td>Activalo en Ajustes y la app detecta pagos de MP, bancos, etc.</td></tr>
+  <tr><td><strong>Recordatorio inteligente</strong></td><td>A la noche te dice cuanto gastaste y pregunta si falta algo</td></tr>
+  <tr><td><strong>Asistente de voz IA</strong></td><td>Dicta tus gastos hablando y el asistente los interpreta automaticamente</td></tr>
+  <tr><td><strong>Onboarding renovado</strong></td><td>Tutorial mas claro en 6 pasos</td></tr>
+  <tr><td><strong>Cuentas vinculadas a MP</strong></td><td>Branding especial para cuentas de Mercado Pago</td></tr>
+  <tr><td><strong>Editor unificado de cuentas</strong></td><td>Edita nombre, tipo, saldo y dia de cierre desde un solo lugar</td></tr>
+</table>
+</div>
+
+<!-- ────────── CHECKLIST ────────── -->
+
+<div class="no-break">
+<h2>Que probar en esta demo</h2>
+<ul class="checklist">
+  <li>Completar el onboarding (tutorial inicial)</li>
+  <li>Crear una cuenta bancaria o tarjeta de credito</li>
+  <li>Cargar 3-4 gastos distintos (probar el boton + violeta)</li>
+  <li>Probar el asistente de voz (mantene presionado el +, o toca el microfono)</li>
+  <li>Crear un presupuesto y gastar hasta superarlo</li>
+  <li>Crear una meta de ahorro y hacer un aporte</li>
+  <li>Agregar una persona y crear un gasto compartido</li>
+  <li>Agregar un item a Compras Inteligentes</li>
+  <li>Probar los widgets de pantalla de inicio (mantene presionado el fondo > Widgets > Sencillo)</li>
+  <li>Revisar el dashboard: saldo, gastos del mes, alertas</li>
+  <li>Probar swipe en movimientos (derecha = editar, izquierda = eliminar)</li>
+  <li>Ir a Analisis y ver el resumen por categoria</li>
+</ul>
+</div>
+
+<!-- ────────── FEEDBACK ────────── -->
+
+<div class="no-break">
+<h2>Feedback</h2>
+<p>Si encontras un bug o tenes una idea de mejora, mandame un mensaje con:</p>
+<ol>
+  <li><strong>Que estabas haciendo</strong></li>
+  <li><strong>Que esperabas que pase</strong></li>
+  <li><strong>Que paso en realidad</strong> (captura de pantalla si podes)</li>
+</ol>
+<p>Toda la data se guarda en tu celular. No se comparte con nadie.</p>
+</div>
+
+<div class="footer">
+  <strong>Gracias por probar Sencillo!</strong><br>
+  Version 1.7.0 &middot; Abril 2026
+</div>
+
+</body>
+</html>

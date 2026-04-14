@@ -10,6 +10,7 @@ import '../../../../core/database/database_providers.dart';
 import '../../../../core/logic/financial_logic.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/providers/auth_provider.dart';
+import '../../../../core/providers/onboarding_provider.dart';
 import '../../../../core/services/cloud_backup_service.dart';
 import '../../../goals/presentation/providers/goals_provider.dart';
 import '../../../budget/presentation/pages/budget_page.dart';
@@ -207,7 +208,7 @@ class _MorePageState extends ConsumerState<MorePage>
                       _CompactRow(
                         icon: Icons.rocket_launch_rounded,
                         label: 'Novedades',
-                        subtitle: 'Versión actual: v1.5.7',
+                        subtitle: 'Versión actual: v1.7.0',
                         color: AppTheme.colorIncome,
                         onTap: () => context.push('/novedades'),
                       ),
@@ -329,7 +330,18 @@ class _MorePageState extends ConsumerState<MorePage>
                       ),
                     );
                     if (confirm == true && mounted) {
-                      await ref.read(firebaseAuthServiceProvider).signOut();
+                      // Cerrar sesión de Firebase si había login con Google
+                      try {
+                        final authState = ref.read(authStateProvider);
+                        if (authState.valueOrNull != null) {
+                          await ref.read(firebaseAuthServiceProvider).signOut();
+                        }
+                      } catch (_) {}
+                      // Resetear skip-auth para que el router mande al login
+                      // (también cubre el caso de usuarios que entraron como
+                      // "Nueva cuenta local" y quieren ir a conectar Google).
+                      await ref.read(skipAuthProvider).reset();
+                      if (context.mounted) context.go('/login');
                     }
                   },
                 ),
@@ -344,7 +356,7 @@ class _MorePageState extends ConsumerState<MorePage>
                   child: GestureDetector(
                     onTap: () => context.push('/novedades'),
                     child: Text(
-                      'Sencillo · v1.5.7',
+                      'Sencillo · v1.7.0',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,

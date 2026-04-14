@@ -12,6 +12,7 @@ class BalanceHeroCard extends StatefulWidget {
   final double safeBudget;
   final double arsCash;
   final double pendingCards;
+  final double totalCardDebt;
   final double totalSavedInGoals;
   final VoidCallback? onSavingsTap;
   final VoidCallback? onIncomeTap;
@@ -23,6 +24,7 @@ class BalanceHeroCard extends StatefulWidget {
     required this.safeBudget,
     required this.arsCash,
     required this.pendingCards,
+    this.totalCardDebt = 0,
     this.totalSavedInGoals = 0,
     this.onSavingsTap,
     this.onIncomeTap,
@@ -43,7 +45,7 @@ class _BalanceHeroCardState extends State<BalanceHeroCard> {
       case _HeroView.efectivo:
         return widget.arsCash;
       case _HeroView.deuda:
-        return widget.pendingCards;
+        return widget.totalCardDebt;
     }
   }
 

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget Criptomonedas — cicla entre assets seleccionados con prev/next -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="@drawable/widget_background_gradient">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Criptomonedas"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.02" />
+
+        <ImageView
+            android:id="@+id/crypto_btn_prev"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:src="@android:drawable/ic_media_previous"
+            android:background="@drawable/widget_chip_inactive"
+            android:padding="5dp"
+            android:contentDescription="Anterior"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <ImageView
+            android:id="@+id/crypto_btn_next"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:src="@android:drawable/ic_media_next"
+            android:background="@drawable/widget_chip_inactive"
+            android:padding="5dp"
+            android:layout_marginStart="6dp"
+            android:contentDescription="Siguiente"
+            android:clickable="true"
+            android:focusable="true" />
+    </LinearLayout>
+
+    <!-- Asset card -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginTop="8dp"
+        android:padding="10dp"
+        android:background="@drawable/widget_card_primary">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/crypto_symbol"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="BTC"
+                android:textColor="#5ECFB1"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.05" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/crypto_change"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+0.00%"
+                android:textColor="#5ECFB1"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:background="@drawable/widget_badge_positive" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/crypto_price"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="US$0"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:layout_marginTop="4dp" />
+
+        <TextView
+            android:id="@+id/crypto_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Bitcoin"
+            android:textColor="#AAAAAA"
+            android:textSize="10sp"
+            android:maxLines="1"
+            android:layout_marginTop="2dp" />
+    </LinearLayout>
+
+</LinearLayout>

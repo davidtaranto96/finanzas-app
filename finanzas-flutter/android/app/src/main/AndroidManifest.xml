@@ -39,6 +39,13 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Custom URI scheme used by home screen widgets (sencillo://) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="sencillo"/>
+            </intent-filter>
         </activity>
         <!-- Scheduled notifications boot receiver -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
@@ -50,6 +57,66 @@
             </intent-filter>
         </receiver>
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+
+        <!-- Widget Gastos con chips Hoy/Semana/Mes -->
+        <receiver android:name=".ExpenseInfoWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.davidtaranto.finanzas_app.ACTION_SET_PERIOD" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/expense_info_widget_info" />
+        </receiver>
+
+        <!-- Widget 1x1: botón rápido para cargar gasto -->
+        <receiver android:name=".QuickExpenseWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_expense_widget_info" />
+        </receiver>
+
+        <!-- Widget cotización dólar -->
+        <receiver android:name=".DollarRateWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/dollar_rate_widget_info" />
+        </receiver>
+
+        <!-- Widget Criptomonedas (prev/next entre assets favoritos) -->
+        <receiver android:name=".CryptoWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.davidtaranto.finanzas_app.CRYPTO_NEXT" />
+                <action android:name="com.davidtaranto.finanzas_app.CRYPTO_PREV" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/crypto_widget_info" />
+        </receiver>
+
+        <!-- Widget Acciones (prev/next entre assets favoritos) -->
+        <receiver android:name=".StocksWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.davidtaranto.finanzas_app.STOCK_NEXT" />
+                <action android:name="com.davidtaranto.finanzas_app.STOCK_PREV" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/stocks_widget_info" />
+        </receiver>
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

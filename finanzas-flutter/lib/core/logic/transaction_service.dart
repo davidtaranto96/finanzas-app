@@ -9,10 +9,10 @@ class TransactionService {
 
   TransactionService(this.db);
 
-  /// Adds a new transaction.
+  /// Adds a new transaction. Devuelve el id de la tx creada (útil para undo).
   /// Balance is recalculated automatically by accountsStreamProvider
   /// from initialBalance + all transactions — no need to touch initialBalance here.
-  Future<void> addTransaction({
+  Future<String> addTransaction({
     required String title,
     required double amount,
     required String type, // 'income' or 'expense'
@@ -21,8 +21,9 @@ class TransactionService {
     DateTime? date,
     String? note,
   }) async {
+    final id = const Uuid().v4();
     await db.into(db.transactionsTable).insert(TransactionsTableCompanion.insert(
-      id: const Uuid().v4(),
+      id: id,
       title: title,
       amount: amount,
       type: type,
@@ -31,6 +32,7 @@ class TransactionService {
       date: date ?? DateTime.now(),
       note: drift.Value(note),
     ));
+    return id;
   }
 
   /// Updates any field of an existing transaction.

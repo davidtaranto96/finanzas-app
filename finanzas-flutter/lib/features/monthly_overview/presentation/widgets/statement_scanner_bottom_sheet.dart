@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -90,9 +90,11 @@ class _StatementScannerBottomSheetState
         throw Exception('No se pudo leer el archivo seleccionado.');
       }
 
-      final text = await Future.microtask(() => PdfParserService.extractText(bytes));
+      // Ejecutar parsing en un isolate aparte para no bloquear la UI.
+      // `Future.microtask` corre en el main isolate, por eso antes freezaba.
+      final text = await compute(PdfParserService.extractText, bytes);
       _detectedFormat = PdfParserService.detectFormat(text);
-      final parsed = await Future.microtask(() => PdfParserService.parse(text));
+      final parsed = await compute(PdfParserService.parse, text);
 
       // Auto-detect statement info (bank, month, year)
       final stInfo = PdfParserService.detectStatementInfo(text);

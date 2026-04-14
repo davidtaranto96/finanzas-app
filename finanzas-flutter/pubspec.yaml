@@ -1,7 +1,7 @@
 name: sencillo
 description: "Sencillo — tu app de finanzas personales: control total + decisiones conscientes + progreso visible"
 publish_to: 'none'
-version: 1.5.8+10
+version: 1.7.0+12
 
 environment:
   sdk: '>=3.1.0 <4.0.0'
@@ -67,6 +67,11 @@ dependencies:
   # QR
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.10
+  home_widget: ^0.9.1
+  notification_listener_service: ^0.3.5
+
+  # Tour interactivo
+  tutorial_coach_mark: ^1.2.11
 
 dev_dependencies:
   flutter_test:

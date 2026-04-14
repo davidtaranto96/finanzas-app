@@ -16,6 +16,11 @@ import 'tables/transactions_table.dart';
 import 'tables/user_profile_table.dart';
 import 'tables/recurring_transactions_table.dart';
 import 'tables/wishlist_table.dart';
+import 'tables/installments_table.dart';
+import 'tables/tags_table.dart';
+import 'tables/scheduled_payments_table.dart';
+import 'tables/friend_requests_table.dart';
+import 'tables/shared_wishlists_table.dart';
 
 part 'app_database.g.dart';
 
@@ -31,13 +36,19 @@ part 'app_database.g.dart';
   UserProfileTable,
   WishlistTable,
   RecurringTransactionsTable,
+  InstallmentsTable,
+  TagsTable,
+  TransactionTagsTable,
+  ScheduledPaymentsTable,
+  FriendRequestsTable,
+  SharedWishlistsTable,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 11;
 
   /// Ensures a default "Efectivo" cash account exists.
   Future<void> ensureDefaultCashAccount() async {
@@ -91,6 +102,16 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 9) {
         await migrator.createTable(recurringTransactionsTable);
+      }
+      if (from < 10) {
+        await migrator.createTable(installmentsTable);
+      }
+      if (from < 11) {
+        await migrator.createTable(tagsTable);
+        await migrator.createTable(transactionTagsTable);
+        await migrator.createTable(scheduledPaymentsTable);
+        await migrator.createTable(friendRequestsTable);
+        await migrator.createTable(sharedWishlistsTable);
       }
     },
   );

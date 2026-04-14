@@ -12,6 +12,71 @@ import '../../features/wishlist/domain/models/wishlist_item.dart';
 
 const _apiKeyPref = 'anthropic_api_key';
 
+/// C7: Mapa emoji → categoryId. Si el input empieza con uno de estos,
+/// la categoría se puede inferir sin llamar a la IA.
+const Map<String, String> kEmojiCategoryMap = {
+  '🍕': 'food', '🍔': 'food', '🍟': 'food', '🌮': 'food', '🍣': 'food',
+  '🍜': 'food', '🥗': 'food', '🍦': 'food', '☕': 'food', '🍺': 'food',
+  '🍷': 'food', '🥐': 'food', '🍰': 'food', '🥙': 'food', '🥟': 'food',
+  '🚗': 'transport', '🚕': 'transport', '🚌': 'transport', '🚇': 'transport',
+  '🛵': 'transport', '🚲': 'transport', '⛽': 'transport', '✈️': 'transport',
+  '🎬': 'entertainment', '🎮': 'entertainment', '🎉': 'entertainment',
+  '🎭': 'entertainment', '🎪': 'entertainment', '🎤': 'entertainment',
+  '🛒': 'shopping', '👕': 'shopping', '👟': 'shopping', '👜': 'shopping',
+  '💄': 'shopping', '📱': 'shopping', '💻': 'shopping',
+  '🏠': 'home', '💡': 'home', '🔧': 'home', '🛋️': 'home',
+  '📶': 'services', '💳': 'services', '📺': 'services',
+  '💊': 'health', '🏥': 'health', '🩺': 'health', '🦷': 'health',
+  '📚': 'education', '🎓': 'education', '✏️': 'education',
+  '💰': 'salary', '💵': 'salary', '💸': 'other_expense',
+};
+
+/// Devuelve el categoryId sugerido si el input empieza con emoji conocido.
+String? emojiCategoryHint(String input) {
+  final trimmed = input.trim();
+  if (trimmed.isEmpty) return null;
+  for (final entry in kEmojiCategoryMap.entries) {
+    if (trimmed.startsWith(entry.key)) return entry.value;
+  }
+  return null;
+}
+
+/// C5: Sugerencia de categoría basada en hora y día de la semana.
+///
+/// Heurísticas livianas que cubren los casos más comunes cuando el usuario
+/// no especifica categoría y la IA tampoco tiene pistas suficientes.
+///
+/// Reglas:
+/// - Lunes-Viernes 12-14h → comida (almuerzo laboral)
+/// - Lunes-Viernes 19-23h → comida (cena)
+/// - Sábado/Domingo 20-3h → entertainment (salidas de fin de semana)
+/// - Primer día del mes + monto > 30k → services (alquiler/servicios)
+/// - 7-10h día hábil → transport (viaje al trabajo)
+///
+/// Devuelve null si ninguna regla aplica.
+String? contextualCategoryHint({
+  required DateTime now,
+  double? amount,
+}) {
+  final hour = now.hour;
+  final weekday = now.weekday; // 1 = lunes, 7 = domingo
+  final dayOfMonth = now.day;
+  final isWeekday = weekday >= 1 && weekday <= 5;
+  final isWeekend = weekday == 6 || weekday == 7;
+
+  // Almuerzo laboral
+  if (isWeekday && hour >= 12 && hour < 14) return 'food';
+  // Cena laboral
+  if (isWeekday && hour >= 19 && hour <= 23) return 'food';
+  // Salidas de fin de semana (sab noche, dom madrugada)
+  if (isWeekend && (hour >= 20 || hour <= 3)) return 'entertainment';
+  // Primer día del mes + monto alto → servicios/alquiler
+  if (dayOfMonth == 1 && (amount ?? 0) > 30000) return 'home';
+  // Horario de ida al trabajo
+  if (isWeekday && hour >= 7 && hour < 10) return 'transport';
+  return null;
+}
+
 /// Strips common Spanish diacritics for fuzzy matching.
 String _stripAccents(String input) {
   return input
@@ -99,6 +164,9 @@ class AiTransactionParser {
     required List<dom_b.Budget> budgets,
     required List<WishlistItem> wishlist,
   }) async {
+    // C7: si el input empieza con emoji conocido, incluir hint en el prompt
+    final emojiHint = emojiCategoryHint(input);
+
     final accountsJson = accounts.map((a) => {
       'id': a.id,
       'name': a.name,
@@ -155,7 +223,7 @@ Gastos: food, transport, health, entertainment, shopping, home, education, servi
 Ingresos: salary, freelance, other_income
 
 INPUT DEL USUARIO: "$input"
-
+${emojiHint != null ? 'PISTA DE CATEGORÍA (por emoji inicial): "$emojiHint" — usá esta categoría salvo que el texto diga otra cosa claramente.\n' : ''}
 Respondé ÚNICAMENTE con JSON válido (sin markdown, sin texto extra):
 {
   "scenario": "<scenario>",
@@ -513,7 +581,10 @@ REGLAS IMPORTANTES:
 
     // ── Detectar escenario ──
     NLScenario scenario = NLScenario.expense;
-    String? categoryId = 'other_expense';
+    // C7 hint por emoji → C5 fallback por hora/día → default
+    String? categoryId = emojiCategoryHint(input) ??
+        contextualCategoryHint(now: DateTime.now(), amount: amount) ??
+        'other_expense';
     String title = 'Gasto';
     String? targetAccountId;
     bool isSplit = false;

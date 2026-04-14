@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Widget Gastos — tamaño por defecto 4x2 (ancho, alto: ~320dp x ~180dp).
+  - resizeMode horizontal|vertical para adaptarse a launchers
+  - minResizeWidth/Height permiten bajar a 2x1 (usa layout reducido por espacio)
+  - targetCellWidth/Height (Android 12+) le dan al launcher la grilla ideal
+  - previewLayout (Android 12+) muestra el layout real en el selector
+  - previewImage es el fallback para Android <12
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:initialLayout="@layout/expense_info_widget"
+    android:previewLayout="@layout/expense_info_widget"
+    android:previewImage="@drawable/widget_preview_expense"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="70dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_info_description" />

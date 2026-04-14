@@ -93,8 +93,10 @@ class _AiAssistantSheetState extends ConsumerState<_AiAssistantSheet>
         }
       },
       localeId: 'es_AR',
-      listenMode: stt.ListenMode.dictation,
-      cancelOnError: true,
+      listenOptions: stt.SpeechListenOptions(
+        listenMode: stt.ListenMode.dictation,
+        cancelOnError: true,
+      ),
     );
   }
 

@@ -27,79 +27,47 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
       icon: Icons.waving_hand_rounded,
       title: 'Bienvenido a Sencillo',
       description:
-          'Tu app de finanzas personales. Simple, privada y poderosa. Tomá el control total de tu dinero.',
+          'Tu plata, organizada.\nControlá gastos, ahorrá con metas y dividí cuentas con amigos. Todo en un solo lugar.',
       color: Color(0xFF6C63FF),
       iconBg: Color(0xFF6C63FF),
     ),
     _Slide(
-      icon: Icons.dashboard_rounded,
-      title: 'Tu resumen diario',
+      icon: Icons.add_circle_outline_rounded,
+      title: 'Registrá tus gastos',
       description:
-          'En el inicio ves tu saldo total, alertas de presupuesto, gastos del mes y los últimos movimientos de un vistazo.',
-      color: Color(0xFF4ECDC4),
-      iconBg: Color(0xFF4ECDC4),
-    ),
-    _Slide(
-      icon: Icons.swap_vert_rounded,
-      title: 'Registrá movimientos',
-      description:
-          'Cargá ingresos, gastos y transferencias. Usá voz o texto con IA para registrar al instante sin formularios.',
+          'Tocá el botón + para cargar un gasto o ingreso.\nElegí la categoría, el monto y la cuenta. Tarda menos de 5 segundos.',
       color: Color(0xFFFF6B6B),
       iconBg: Color(0xFFFF6B6B),
     ),
     _Slide(
       icon: Icons.account_balance_wallet_rounded,
-      title: 'Cuentas y tarjetas',
+      title: 'Tus cuentas',
       description:
-          'Gestioná todas tus cuentas: efectivo, banco, billeteras virtuales y tarjetas de crédito con control de ciclo.',
-      color: Color(0xFF7C6EF7),
-      iconBg: Color(0xFF7C6EF7),
+          'Agregá tus cuentas: efectivo, banco, tarjetas de crédito.\nCada una muestra su saldo real y sus movimientos.',
+      color: Color(0xFF4ECDC4),
+      iconBg: Color(0xFF4ECDC4),
     ),
     _Slide(
-      icon: Icons.pie_chart_rounded,
-      title: 'Presupuestos',
+      icon: Icons.savings_rounded,
+      title: 'Presupuestos y metas',
       description:
-          'Poné límites de gasto por categoría. La app te avisa cuando estás por pasarte para que no pierdas el control.',
-      color: Color(0xFFFFD93D),
+          'Poné límites de gasto mensuales por categoría.\nCreá metas de ahorro y seguí tu progreso hasta cumplirlas.',
+      color: Color(0xFFFFB347),
       iconBg: Color(0xFFFFB347),
     ),
     _Slide(
-      icon: Icons.flag_rounded,
-      title: 'Metas de ahorro',
-      description:
-          'Creá objetivos y registrá aportes. Seguí tu progreso visual hasta cumplir cada meta.',
-      color: Color(0xFF5ECFB1),
-      iconBg: Color(0xFF5ECFB1),
-    ),
-    _Slide(
       icon: Icons.people_rounded,
-      title: 'Gastos con personas',
+      title: 'Gastos compartidos',
       description:
-          'Dividí gastos con amigos o familia. La app lleva la cuenta de quién debe cuánto automáticamente, como Splitwise.',
+          'Dividí cuentas con amigos o familia.\nLa app calcula quién debe cuánto y podés liquidar deudas fácilmente.',
       color: Color(0xFFFF8C69),
       iconBg: Color(0xFFFF8C69),
     ),
     _Slide(
-      icon: Icons.notifications_active_rounded,
-      title: 'Alertas y recordatorios',
-      description:
-          'Recibí notificaciones de vencimientos de tarjetas, deudas pendientes y alertas de presupuesto en tu celular.',
-      color: Color(0xFFE040FB),
-      iconBg: Color(0xFFE040FB),
-    ),
-    _Slide(
-      icon: Icons.cloud_done_rounded,
-      title: 'Backup en la nube',
-      description:
-          'Tus datos se respaldan en la nube con tu cuenta de Google. Cambiás de celular y recuperás todo al instante.',
-      color: Color(0xFF40C4FF),
-      iconBg: Color(0xFF40C4FF),
-    ),
-    _Slide(
       icon: Icons.auto_awesome_rounded,
-      title: '¡Todo listo!',
+      title: '¡Listo para empezar!',
       description:
-          'Personalizá las pestañas, el tema y las alertas desde Configuración. Tu experiencia, a tu medida.',
+          'Empezá cargando tu primer gasto.\nPodés personalizar todo desde Configuración cuando quieras.',
       color: Color(0xFF6C63FF),
       iconBg: Color(0xFF6C63FF),
     ),

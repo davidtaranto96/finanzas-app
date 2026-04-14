@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,9 +16,15 @@ import '../../../../core/logic/user_profile_service.dart';
 import '../../../../core/widgets/tab_config_sheet.dart';
 import '../../../../core/providers/alerts_provider.dart';
 import '../../../../core/providers/onboarding_provider.dart';
+import '../../../../core/providers/setup_wizard_provider.dart';
+import '../../../../core/providers/interactive_tour_provider.dart';
+import '../../../../core/providers/page_coach_provider.dart';
+import '../../../../core/widgets/page_coach.dart';
 import '../../../../core/providers/feedback_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
+import '../../../../core/services/cloud_backup_service.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/notification_listener_service.dart';
 import '../../../wishlist/presentation/providers/wishlist_provider.dart';
 import '../../../../core/providers/mercado_pago_provider.dart';
 import '../../../../core/logic/account_service.dart';
@@ -34,6 +41,9 @@ class SettingsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) showPageCoachIfNeeded(context, ref, 'settings');
+    });
     final cs = Theme.of(context).colorScheme;
     final db = ref.read(databaseProvider);
 
@@ -102,6 +112,54 @@ class SettingsPage extends ConsumerWidget {
               }
             },
           ),
+          _SettingsTile(
+            icon: Icons.tour_rounded,
+            title: 'Repetir tour interactivo',
+            subtitle: 'Ver de nuevo las explicaciones en la app',
+            color: const Color(0xFF5ECFB1),
+            onTap: () async {
+              await ref.read(interactiveTourProvider).reset();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Tour activado. Se mostrará al volver a Inicio.'),
+                  ),
+                );
+              }
+            },
+          ),
+          _SettingsTile(
+            icon: Icons.menu_book_rounded,
+            title: 'Repetir guías por pantalla',
+            subtitle: 'Ver de nuevo las mini-guías de cada sección',
+            color: const Color(0xFF6C63FF),
+            onTap: () async {
+              await ref.read(pageCoachProvider).resetAll();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Guías restablecidas. Aparecerán al entrar a cada pantalla.'),
+                  ),
+                );
+              }
+            },
+          ),
+          _SettingsTile(
+            icon: Icons.rocket_launch_outlined,
+            title: 'Repetir asistente de configuración',
+            subtitle: 'Volver al wizard de bienvenida',
+            color: const Color(0xFFFFB547),
+            onTap: () async {
+              await ref.read(setupWizardProvider).reset();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Asistente restablecido. Se mostrará al reiniciar la app.'),
+                  ),
+                );
+              }
+            },
+          ),
 
           const SizedBox(height: 24),
           _SectionTitle('Feedback'),
@@ -164,6 +222,13 @@ class SettingsPage extends ConsumerWidget {
             subtitle: 'Cada lunes, revisá tu semana',
             color: const Color(0xFF0066CC),
             provider: notifWeeklySummaryEnabledProvider,
+          ),
+          _SwitchTile(
+            icon: Icons.notifications_active_rounded,
+            title: 'Detectar transferencias',
+            subtitle: 'Sugerir registrar gastos de apps bancarias',
+            color: const Color(0xFF009EE3),
+            provider: autoDetectExpensesProvider,
           ),
 
           const SizedBox(height: 24),
@@ -417,20 +482,159 @@ class _ConnectGoogleCard extends ConsumerWidget {
       padding: const EdgeInsets.only(top: 12),
       child: GestureDetector(
         onTap: () async {
+          // Confirmación con explicación del propósito
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF1A1A2E),
+              title: Text('Conectar cuenta Google',
+                  style: GoogleFonts.quicksand(
+                      color: Colors.white, fontWeight: FontWeight.w700)),
+              content: Text(
+                'Al conectar tu cuenta de Google se va a crear una copia de '
+                'seguridad automática de todos tus datos (cuentas, movimientos, '
+                'presupuestos, metas, personas, etc.) en la nube.\n\n'
+                'Podés recuperarlos desde cualquier dispositivo.',
+                style: GoogleFonts.inter(color: Colors.white70, fontSize: 13),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancelar'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text('Conectar',
+                      style: GoogleFonts.inter(
+                          color: const Color(0xFF5ECFB1),
+                          fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          );
+          if (confirm != true) return;
+
           try {
             final service = ref.read(firebaseAuthServiceProvider);
             final user = await service.signInWithGoogle();
-            if (user != null) {
-              // Clear skip-auth flag since they're now logged in
-              await ref.read(skipAuthProvider).reset();
-              if (!context.mounted) return;
+            if (user == null) return;
+
+            await ref.read(skipAuthProvider).reset();
+
+            // Backup inicial automático — subir datos locales a la nube
+            String? backupError;
+            bool backupRan = false;
+            try {
+              final backupService = CloudBackupService(uid: user.uid);
+              // Si ya tenía backup en la nube, preguntar si sobreescribir o restaurar
+              final remoteDate = await backupService.remoteBackupDate();
+              if (remoteDate != null && context.mounted) {
+                final dateStr =
+                    '${remoteDate.day}/${remoteDate.month}/${remoteDate.year}';
+                final choice = await showDialog<String>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: const Color(0xFF1A1A2E),
+                    title: Text('Ya tenés un backup en la nube',
+                        style: GoogleFonts.quicksand(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700)),
+                    content: Text(
+                      'Encontramos un backup del $dateStr en esta cuenta.\n\n'
+                      '¿Querés restaurarlo (reemplaza tus datos actuales) o '
+                      'sobrescribirlo con los datos de este dispositivo?',
+                      style: GoogleFonts.inter(
+                          color: Colors.white70, fontSize: 13),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, 'cancel'),
+                        child: const Text('Cancelar'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, 'restore'),
+                        child: Text('Restaurar nube',
+                            style: GoogleFonts.inter(
+                                color: const Color(0xFF40C4FF),
+                                fontWeight: FontWeight.w700)),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, 'overwrite'),
+                        child: Text('Subir mis datos',
+                            style: GoogleFonts.inter(
+                                color: const Color(0xFF5ECFB1),
+                                fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                );
+                if (choice == 'restore') {
+                  final db = ref.read(databaseProvider);
+                  await db.close();
+                  await backupService.downloadBackup();
+                  ref.invalidate(databaseProvider);
+                  backupRan = true;
+                } else if (choice == 'overwrite') {
+                  await backupService.uploadBackup();
+                  backupRan = true;
+                }
+              } else {
+                // No hay backup previo → subir datos locales
+                await backupService.uploadBackup();
+                backupRan = true;
+              }
+            } catch (e) {
+              backupError = e.toString().replaceFirst('Exception: ', '');
+            }
+
+            if (!context.mounted) return;
+            if (backupError != null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'Cuenta conectada: ${user.email}',
+                    '⚠ Conectaste ${user.email}, pero el backup falló: $backupError',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+                  ),
+                  backgroundColor: Colors.orange.shade700,
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            } else if (backupRan) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    '✓ Conectado: ${user.email} — backup activado',
                     style: GoogleFonts.inter(fontWeight: FontWeight.w500),
                   ),
                   backgroundColor: const Color(0xFF5ECFB1),
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            } else {
+              // Canceló el diálogo de conflicto
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    '✓ Conectado: ${user.email} (sin backup todavía)',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+                  ),
+                  backgroundColor: const Color(0xFF40C4FF),
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            }
+          } on FirebaseAuthException catch (e) {
+            if (context.mounted) {
+              final msg = e.code == 'credential-already-in-use'
+                  ? 'Esa cuenta de Google ya está vinculada a otro usuario.'
+                  : e.code == 'network-request-failed'
+                      ? 'Sin conexión a internet. Probá de nuevo.'
+                      : 'Error al conectar (${e.code}).';
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(msg),
+                  backgroundColor: Colors.redAccent,
+                  duration: const Duration(seconds: 4),
                 ),
               );
             }
@@ -486,7 +690,7 @@ class _ConnectGoogleCard extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Activá backup y sincronización',
+                      'Backup automático de tus datos en la nube',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: Colors.white54,

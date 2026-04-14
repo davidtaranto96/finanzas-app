@@ -6,12 +6,16 @@ import 'package:intl/intl.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/providers/feedback_provider.dart';
+import '../../../../core/widgets/page_coach.dart';
 
 class NotificationsPage extends ConsumerWidget {
   const NotificationsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) showPageCoachIfNeeded(context, ref, 'notifications');
+    });
     final notifications = ref.watch(notificationCenterProvider);
     final unread = ref.watch(unreadNotificationCountProvider);
 

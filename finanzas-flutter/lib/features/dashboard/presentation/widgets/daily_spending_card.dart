@@ -76,9 +76,19 @@ class _DailySpendingCardState extends State<DailySpendingCard> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: const Color(0xFF1A1A28),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+        border: Border.all(
+          color: const Color(0xFF6C63FF).withValues(alpha: 0.18),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6C63FF).withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,25 +334,33 @@ class _PeriodChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
         decoration: BoxDecoration(
-          color: active
-              ? AppTheme.colorExpense.withValues(alpha: 0.15)
-              : Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: active
-                ? AppTheme.colorExpense.withValues(alpha: 0.3)
-                : Colors.transparent,
-          ),
+          gradient: active
+              ? const LinearGradient(
+                  colors: [Color(0xFF6C63FF), Color(0xFF5ECFB1)],
+                )
+              : null,
+          color: active ? null : Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF6C63FF).withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: GoogleFonts.inter(
             fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: active ? AppTheme.colorExpense : Colors.white38,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+            color: active ? Colors.white : Colors.white38,
           ),
         ),
       ),

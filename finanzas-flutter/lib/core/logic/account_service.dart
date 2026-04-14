@@ -90,31 +90,40 @@ class AccountService {
     late String cardName;
     final txIds = <String>[];
 
+    // Yield al event loop para que la UI muestre el overlay de loading antes
+    // de empezar el batch insert (evita que se vea congelada).
+    await Future.delayed(Duration.zero);
+
+    // Pre-construir todos los companions fuera de la transacción
+    final companions = <TransactionsTableCompanion>[];
+    for (final tx in selected) {
+      final txId = const Uuid().v4();
+      txIds.add(txId);
+      final note = tx.isInstallment ? tx.installmentLabel : null;
+      companions.add(TransactionsTableCompanion.insert(
+        id: txId,
+        title: tx.description,
+        amount: tx.amount,
+        type: 'expense',
+        categoryId: tx.suggestedCategoryId,
+        accountId: cardAccountId,
+        date: tx.date,
+        note: drift.Value(note),
+      ));
+    }
+    final total = selected.fold(0.0, (sum, t) => sum + t.amount);
+
     await db.transaction(() async {
       final card = await (db.select(db.accountsTable)
           ..where((t) => t.id.equals(cardAccountId)))
           .getSingle();
       cardName = card.name;
 
-      // Insertar cada transacción seleccionada
-      for (final tx in selected) {
-        final txId = const Uuid().v4();
-        txIds.add(txId);
-        final note = tx.isInstallment ? tx.installmentLabel : null;
-        await db.into(db.transactionsTable).insert(TransactionsTableCompanion.insert(
-          id: txId,
-          title: tx.description,
-          amount: tx.amount,
-          type: 'expense',
-          categoryId: tx.suggestedCategoryId,
-          accountId: cardAccountId,
-          date: tx.date,
-          note: drift.Value(note),
-        ));
-      }
+      // Batch insert — una sola sentencia SQL en vez de N awaits
+      await db.batch((batch) {
+        batch.insertAll(db.transactionsTable, companions);
+      });
 
-      // Actualizar pendingStatementAmount con el total importado
-      final total = selected.fold(0.0, (sum, t) => sum + t.amount);
       await (db.update(db.accountsTable)
           ..where((t) => t.id.equals(cardAccountId)))
           .write(AccountsTableCompanion(

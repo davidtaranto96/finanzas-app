@@ -35,20 +35,84 @@ class CloudBackupService {
 
   /// Descarga el backup de Firebase Storage y reemplaza la DB local.
   /// ⚠️ La app debe reiniciarse para que Drift use la nueva DB.
+  ///
+  /// Proceso seguro:
+  /// 1. Descarga a `.tmp`
+  /// 2. Valida header mágico SQLite
+  /// 3. Renombra la DB actual a `.bak` (por si hay que revertir)
+  /// 4. Rename atómico `.tmp` → real
+  /// 5. Borra `.bak` si todo salió ok
+  ///
+  /// Si la validación falla, tira excepción y NO toca la DB actual.
   Future<void> downloadBackup() async {
     final dbFile = await _dbFile();
     final tempFile = File('${dbFile.path}.tmp');
+    final backupFile = File('${dbFile.path}.bak');
+
+    // Limpiar residuos de intentos previos
+    if (await tempFile.exists()) await tempFile.delete();
+    if (await backupFile.exists()) await backupFile.delete();
 
     await _backupRef.writeToFile(tempFile);
 
-    if (await tempFile.exists()) {
-      if (await dbFile.exists()) await dbFile.delete();
+    if (!await tempFile.exists()) {
+      throw Exception('No se pudo descargar el backup.');
+    }
+
+    // Validar que sea un SQLite válido antes de tocar la DB real
+    final isValid = await _isValidSqlite(tempFile);
+    if (!isValid) {
+      await tempFile.delete();
+      throw Exception('El backup descargado está corrupto.');
+    }
+
+    // Backup de la DB actual por si algo sale mal
+    if (await dbFile.exists()) {
+      await dbFile.rename(backupFile.path);
+    }
+
+    try {
       await tempFile.rename(dbFile.path);
+      // Todo ok, eliminar el backup anterior
+      if (await backupFile.exists()) await backupFile.delete();
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('last_restore_ts', DateTime.now().toIso8601String());
-    } else {
-      throw Exception('No se pudo descargar el backup.');
+      await prefs.setString(
+          'last_restore_ts', DateTime.now().toIso8601String());
+    } catch (e) {
+      // Rename falló: restaurar backup
+      if (await backupFile.exists()) {
+        await backupFile.rename(dbFile.path);
+      }
+      rethrow;
+    }
+  }
+
+  /// Verifica que un archivo sea un SQLite válido leyendo el header mágico.
+  /// Los primeros 16 bytes de un SQLite válido son "SQLite format 3\0".
+  Future<bool> _isValidSqlite(File file) async {
+    try {
+      final length = await file.length();
+      if (length < 100) return false; // Un SQLite tiene mínimo 100 bytes de header
+
+      final raf = await file.open();
+      try {
+        final header = await raf.read(16);
+        // "SQLite format 3\x00"
+        const expected = [
+          0x53, 0x51, 0x4C, 0x69, 0x74, 0x65, 0x20, 0x66,
+          0x6F, 0x72, 0x6D, 0x61, 0x74, 0x20, 0x33, 0x00,
+        ];
+        if (header.length != 16) return false;
+        for (var i = 0; i < 16; i++) {
+          if (header[i] != expected[i]) return false;
+        }
+        return true;
+      } finally {
+        await raf.close();
+      }
+    } catch (_) {
+      return false;
     }
   }
 
